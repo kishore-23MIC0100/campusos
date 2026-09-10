@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { ClassTeacherCard } from '../../components/common/ClassTeacherCard';
 import {
   Users, CheckSquare, BookOpen, Clock, Calendar, Megaphone,
   CheckCircle2, ArrowRight, Award, Trophy, Sparkles, TrendingUp,
@@ -172,7 +173,7 @@ export const StudentDashboard: React.FC = () => {
 
                 <Link
                   to="/homework"
-                  className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold"
+                  className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold cursor-pointer"
                 >
                   Submit
                 </Link>
@@ -181,6 +182,13 @@ export const StudentDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Class Teacher & Faculty Mentor Section */}
+      <ClassTeacherCard
+        classKey="Grade 10A"
+        studentName={user?.fullName || 'Arav Patel'}
+        isParentView={false}
+      />
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { ClassTeacherCard } from '../../components/common/ClassTeacherCard';
 import {
   HeartHandshake, CheckSquare, BookOpen, Clock, Calendar, Megaphone,
   CheckCircle2, ArrowRight, Award, Trophy, Sparkles, TrendingUp,
@@ -201,6 +202,13 @@ export const ParentDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Class Teacher & Faculty Mentor Section for Active Child */}
+      <ClassTeacherCard
+        classKey={activeChild.grade === 'Grade 7' ? 'Grade 7A' : 'Grade 10A'}
+        studentName={`${activeChild.first_name} ${activeChild.last_name}`}
+        isParentView={true}
+      />
     </div>
   );
 };
