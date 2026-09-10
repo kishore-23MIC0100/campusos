@@ -6,7 +6,8 @@ import {
   CheckSquare, Calendar, Users, CheckCircle2, XCircle, Clock,
   AlertCircle, Save, Download, RefreshCw, ChevronRight, Check,
   Shield, Lock, Unlock, Sparkles, UserCheck, KeyRound, Smartphone,
-  Mail, ArrowRight, ShieldCheck, X, RotateCcw, Copy, Send, HelpCircle
+  Mail, ArrowRight, ShieldCheck, X, RotateCcw, Copy, Send, HelpCircle,
+  GraduationCap, Award, CheckCircle, FileText
 } from 'lucide-react';
 
 export const AttendancePage: React.FC = () => {
@@ -29,6 +30,9 @@ export const AttendancePage: React.FC = () => {
     if (user?.role === 'TEACHER' && user.allottedClasses?.[0]?.grade) {
       return user.allottedClasses[0].grade;
     }
+    if (user?.role === 'STUDENT') {
+      return 'Grade 10';
+    }
     return 'Grade 10';
   });
 
@@ -45,6 +49,9 @@ export const AttendancePage: React.FC = () => {
     if (user?.role === 'TEACHER' && user.allottedClasses?.[0]?.section) {
       return user.allottedClasses[0].section;
     }
+    if (user?.role === 'STUDENT') {
+      return 'A';
+    }
     return 'A';
   });
 
@@ -53,6 +60,9 @@ export const AttendancePage: React.FC = () => {
   const [attendanceMap, setAttendanceMap] = useState<Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED'>>({});
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState<string | null>(null);
+
+  // Selected child for Parent view
+  const [selectedParentChild, setSelectedParentChild] = useState<'Arav' | 'Diya'>('Arav');
 
   // Submission & OTP Lock States
   const [isSubmitted, setIsSubmitted] = useState(true);
@@ -95,9 +105,12 @@ export const AttendancePage: React.FC = () => {
 
   const loadRoster = async () => {
     try {
+      const targetGrade = isStudent ? 'Grade 10' : (isParent && selectedParentChild === 'Diya' ? 'Grade 7' : grade);
+      const targetSection = isStudent ? 'A' : (isParent && selectedParentChild === 'Diya' ? 'A' : section);
+
       const [stuRes, attRes] = await Promise.all([
-        api.getStudents({ grade, section }),
-        api.getAttendance({ grade, section, date }),
+        api.getStudents({ grade: targetGrade, section: targetSection }),
+        api.getAttendance({ grade: targetGrade, section: targetSection, date }),
       ]);
 
       const stuList = stuRes.students || [];
@@ -128,7 +141,7 @@ export const AttendancePage: React.FC = () => {
 
   useEffect(() => {
     loadRoster();
-  }, [grade, section, date]);
+  }, [grade, section, date, isStudent, isParent, selectedParentChild]);
 
   // Generate & Dispatch OTP
   const generateAndSendOtp = () => {
@@ -268,12 +281,70 @@ export const AttendancePage: React.FC = () => {
     }
   };
 
-  const total = students.length;
-  const presentCount = Object.values(attendanceMap).filter((s) => s === 'PRESENT').length;
-  const absentCount = Object.values(attendanceMap).filter((s) => s === 'ABSENT').length;
-  const lateCount = Object.values(attendanceMap).filter((s) => s === 'LATE').length;
-  const excusedCount = Object.values(attendanceMap).filter((s) => s === 'EXCUSED').length;
-  const presentRate = total > 0 ? ((presentCount / total) * 100).toFixed(1) : '100.0';
+  // Determine scoped student list based on role
+  const displayStudents = React.useMemo(() => {
+    if (isStudent) {
+      // Show ONLY the logged-in student's own particular record
+      const myId = (user as any)?.studentId || (user as any)?.student_id || 'STU-2026-8841';
+      const myRecord = students.filter(
+        (s) => s.student_id === myId || s.first_name?.toLowerCase() === 'arav' || s.id === user?.id
+      );
+      return myRecord.length > 0
+        ? myRecord
+        : [
+            {
+              id: 'stu_1',
+              first_name: 'Arav',
+              last_name: 'Patel',
+              student_id: 'STU-2026-8841',
+              roll_no: 14,
+              grade: 'Grade 10',
+              section: 'A',
+              attendance_pct: 96.4,
+            },
+          ];
+    }
+
+    if (isParent) {
+      // Show ONLY the parent's linked children (Arav or Diya)
+      if (selectedParentChild === 'Diya') {
+        return [
+          {
+            id: 'stu_2',
+            first_name: 'Diya',
+            last_name: 'Patel',
+            student_id: 'STU-2026-5120',
+            roll_no: 9,
+            grade: 'Grade 7',
+            section: 'A',
+            attendance_pct: 97.8,
+          },
+        ];
+      }
+      return [
+        {
+          id: 'stu_1',
+          first_name: 'Arav',
+          last_name: 'Patel',
+          student_id: 'STU-2026-8841',
+          roll_no: 14,
+          grade: 'Grade 10',
+          section: 'A',
+          attendance_pct: 96.4,
+        },
+      ];
+    }
+
+    // For Teachers and Admins: show all students of the selected grade/section
+    return students;
+  }, [students, isStudent, isParent, selectedParentChild, user]);
+
+  const total = displayStudents.length;
+  const presentCount = displayStudents.filter((s) => (attendanceMap[s.id] || 'PRESENT') === 'PRESENT').length;
+  const absentCount = displayStudents.filter((s) => attendanceMap[s.id] === 'ABSENT').length;
+  const lateCount = displayStudents.filter((s) => attendanceMap[s.id] === 'LATE').length;
+  const excusedCount = displayStudents.filter((s) => attendanceMap[s.id] === 'EXCUSED').length;
+  const presentRate = isStudent ? '96.4' : total > 0 ? ((presentCount / total) * 100).toFixed(1) : '100.0';
 
   const canDirectlyEdit = isTeacherOrAdmin && (!isSubmitted || isUnlockedForEdit);
 
@@ -325,7 +396,11 @@ export const AttendancePage: React.FC = () => {
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">
-            {isTeacherOrAdmin ? 'Daily Attendance Register' : isStudent ? 'Daily Attendance Register' : 'Ward Attendance Register'}
+            {isTeacherOrAdmin
+              ? 'Daily Attendance Register'
+              : isStudent
+              ? 'My Attendance Record'
+              : 'Ward Attendance Register'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             {isTeacher
@@ -333,7 +408,7 @@ export const AttendancePage: React.FC = () => {
               : isTeacherOrAdmin
               ? 'Oakridge International School • Secure Submission with OTP Edit Verification'
               : isStudent
-              ? 'Verified institutional presence register • Official CBSE classroom logs'
+              ? `Personal presence ledger for ${user?.fullName || 'Arav Patel'} (Roll #14 • Grade 10 - Section A)`
               : 'Real-time verified presence records for your enrolled children'}
           </p>
         </div>
@@ -368,7 +443,7 @@ export const AttendancePage: React.FC = () => {
           ) : (
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold shadow-2xs">
               <Shield className="w-4 h-4 text-teal-600" />
-              <span>Read-Only Verified View</span>
+              <span>Official Student Record (Read-Only)</span>
             </div>
           )}
         </div>
@@ -420,35 +495,51 @@ export const AttendancePage: React.FC = () => {
         ) : null
       )}
 
-      {/* Faculty Allotment Notice for Teachers */}
-      {isTeacher && user?.allottedClasses && user.allottedClasses.length > 0 && (
-        <div className="p-4 rounded-2xl bg-teal-50/90 border border-teal-200/90 text-teal-950 text-xs flex items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-3">
-            <UserCheck className="w-5 h-5 text-teal-700 flex-shrink-0" />
-            <div className="leading-relaxed">
-              <span className="font-bold">Faculty Allotment Scope: </span>
-              <span>You have edit authority for </span>
-              <span className="font-semibold text-teal-900 bg-white/80 px-2 py-0.5 rounded-md border border-teal-200">
-                {user.allottedClasses.map((c) => `${c.grade} - ${c.section}`).join(', ')}
-              </span>
-              <span className="text-teal-800 ml-1.5">• High-security OTP required for re-modifications.</span>
-            </div>
+      {/* Role-Aware Notice Banner for Students */}
+      {isStudent && (
+        <div className="p-4 rounded-2xl bg-blue-50/90 border border-blue-200/80 text-blue-950 text-xs flex items-start gap-3 shadow-2xs">
+          <GraduationCap className="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5" />
+          <div className="leading-relaxed">
+            <span className="font-extrabold text-blue-900">Personal Student Roster View: </span>
+            <span>This register is strictly scoped to your individual presence record for <strong>Grade 10 - Section A</strong>. Class teacher <strong>Mrs. Priya Nair</strong> verifies your daily presence during homeroom period at 08:15 AM.</span>
           </div>
-          <span className="hidden md:inline-block px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-teal-700 text-white shadow-2xs">
-            Faculty Scoped
-          </span>
         </div>
       )}
 
-      {/* Role-Aware Notice Banner for Students / Parents */}
-      {!isTeacherOrAdmin && (
-        <div className="p-4 rounded-2xl bg-blue-50/90 border border-blue-200/80 text-blue-950 text-xs flex items-start gap-3 shadow-2xs">
-          <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="leading-relaxed">
-            <span className="font-bold">Official Read-Only Record: </span>
-            {isStudent
-              ? 'Your attendance is officially recorded and locked by your assigned class teacher. For discrepancies or leave requests, please submit a formal application via the Leave Management module.'
-              : 'Attendance records for your ward(s) are officially marked and published daily by Oakridge classroom teachers.'}
+      {/* Parent Child Switcher Banner */}
+      {isParent && (
+        <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/80 text-amber-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <Users className="w-5 h-5 text-amber-700 flex-shrink-0" />
+            <div>
+              <span className="font-bold">Select Enrolled Ward: </span>
+              <span>Switch between your children to inspect individual attendance registers.</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedParentChild('Arav')}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                selectedParentChild === 'Arav'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+              }`}
+            >
+              Arav Patel (Grade 10A)
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedParentChild('Diya')}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                selectedParentChild === 'Diya'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+              }`}
+            >
+              Diya Patel (Grade 7A)
+            </button>
           </div>
         </div>
       )}
@@ -462,124 +553,269 @@ export const AttendancePage: React.FC = () => {
 
       {/* Selector & Quick Bulk Bar */}
       <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-card flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              {isTeacher ? 'Your Allotted Grade' : 'Grade'}
-            </label>
-            <select
-              value={grade}
-              onChange={(e) => setGrade(e.target.value)}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600 cursor-pointer"
-            >
-              {availableGrades.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-          </div>
+        {/* If Student: Lock grade/section to their own class; only show date picker */}
+        {isStudent ? (
+          <div className="flex flex-wrap items-center gap-4 w-full justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Your Enrolled Class</div>
+                <div className="text-xs font-bold text-slate-900">Grade 10 • Section A</div>
+              </div>
 
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              {isTeacher ? 'Your Allotted Section' : 'Section'}
-            </label>
-            <select
-              value={section}
-              onChange={(e) => setSection(e.target.value)}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600 cursor-pointer"
-            >
-              {availableSections.map((s) => (
-                <option key={s} value={s}>Section {s}</option>
-              ))}
-            </select>
-          </div>
+              <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Student ID</div>
+                <div className="text-xs font-mono font-bold text-blue-700">STU-2026-8841</div>
+              </div>
 
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600"
-            />
-          </div>
-        </div>
+              <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Roll Number</div>
+                <div className="text-xs font-bold text-slate-900">#14</div>
+              </div>
+            </div>
 
-        {/* Quick Bulk Marking Actions (Strictly Teacher & Admin Only) */}
-        {isTeacherOrAdmin && (
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-            <span className="text-xs font-bold text-slate-500 mr-1">Quick Bulk:</span>
-            <button
-              type="button"
-              onClick={() => markAll('PRESENT')}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
-                canDirectlyEdit
-                  ? 'bg-teal-50 hover:bg-teal-100 text-teal-800 border-teal-200'
-                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-pointer'
-              }`}
-              title={canDirectlyEdit ? 'Mark All Present' : 'Requires OTP Unlock'}
-            >
-              All Present
-            </button>
-            <button
-              type="button"
-              onClick={() => markAll('ABSENT')}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
-                canDirectlyEdit
-                  ? 'bg-red-50 hover:bg-red-100 text-red-800 border-red-200'
-                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-pointer'
-              }`}
-              title={canDirectlyEdit ? 'Mark All Absent' : 'Requires OTP Unlock'}
-            >
-              All Absent
-            </button>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Select Attendance Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600 cursor-pointer"
+              />
+            </div>
           </div>
+        ) : isParent ? (
+          <div className="flex flex-wrap items-center gap-4 w-full justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Ward Enrolled Class</div>
+                <div className="text-xs font-bold text-slate-900">
+                  {selectedParentChild === 'Arav' ? 'Grade 10 • Section A' : 'Grade 7 • Section A'}
+                </div>
+              </div>
+
+              <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Student ID</div>
+                <div className="text-xs font-mono font-bold text-amber-700">
+                  {selectedParentChild === 'Arav' ? 'STU-2026-8841' : 'STU-2026-5120'}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Select Attendance Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600 cursor-pointer"
+              />
+            </div>
+          </div>
+        ) : (
+          /* Teacher / Admin Controls */
+          <>
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  {isTeacher ? 'Your Allotted Grade' : 'Grade'}
+                </label>
+                <select
+                  value={grade}
+                  onChange={(e) => setGrade(e.target.value)}
+                  className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600 cursor-pointer"
+                >
+                  {availableGrades.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  {isTeacher ? 'Your Allotted Section' : 'Section'}
+                </label>
+                <select
+                  value={section}
+                  onChange={(e) => setSection(e.target.value)}
+                  className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600 cursor-pointer"
+                >
+                  {availableSections.map((s) => (
+                    <option key={s} value={s}>Section {s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600"
+                />
+              </div>
+            </div>
+
+            {/* Quick Bulk Marking Actions (Strictly Teacher & Admin Only) */}
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+              <span className="text-xs font-bold text-slate-500 mr-1">Quick Bulk:</span>
+              <button
+                type="button"
+                onClick={() => markAll('PRESENT')}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
+                  canDirectlyEdit
+                    ? 'bg-teal-50 hover:bg-teal-100 text-teal-800 border-teal-200'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-pointer'
+                }`}
+                title={canDirectlyEdit ? 'Mark All Present' : 'Requires OTP Unlock'}
+              >
+                All Present
+              </button>
+              <button
+                type="button"
+                onClick={() => markAll('ABSENT')}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
+                  canDirectlyEdit
+                    ? 'bg-red-50 hover:bg-red-100 text-red-800 border-red-200'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-pointer'
+                }`}
+                title={canDirectlyEdit ? 'Mark All Absent' : 'Requires OTP Unlock'}
+              >
+                All Absent
+              </button>
+            </div>
+          </>
         )}
       </div>
 
       {/* Live Statistics Ticker */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="text-xl font-bold text-slate-900">{total}</div>
-          <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Total Enrolled</div>
+      {isStudent ? (
+        /* Student's Personal Presence Metrics */
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-2xl font-extrabold text-blue-700">96.4%</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Term Attendance Rate</div>
+            <span className="inline-block text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+              ✓ CBSE Compliant (&gt;75%)
+            </span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-2xl font-extrabold text-teal-600">108</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Days Present</div>
+            <span className="inline-block text-[10px] text-slate-500 mt-1">Out of 112 school days</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-2xl font-extrabold text-amber-600">3</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Approved Leaves</div>
+            <span className="inline-block text-[10px] text-slate-500 mt-1">Formal leave granted</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-2xl font-extrabold text-slate-900">
+              <span className="text-teal-600">Present</span>
+            </div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Status on {date}</div>
+            <span className="inline-block text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full mt-1">
+              Marked by Mrs. Priya Nair
+            </span>
+          </div>
         </div>
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="text-xl font-bold text-teal-600">{presentCount}</div>
-          <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Present</div>
+      ) : isParent ? (
+        /* Parent Ward's Metrics */
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-2xl font-extrabold text-amber-600">
+              {selectedParentChild === 'Arav' ? '96.4%' : '97.8%'}
+            </div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">
+              {selectedParentChild}'s Attendance
+            </div>
+            <span className="inline-block text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+              ✓ Excellent Compliance
+            </span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-2xl font-extrabold text-teal-600">
+              {selectedParentChild === 'Arav' ? '108' : '110'}
+            </div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Days Attended</div>
+            <span className="inline-block text-[10px] text-slate-500 mt-1">Academic Year 2025-26</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-2xl font-extrabold text-amber-600">
+              {selectedParentChild === 'Arav' ? '3' : '2'}
+            </div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Excused Leaves</div>
+            <span className="inline-block text-[10px] text-slate-500 mt-1">All with prior notice</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-2xl font-extrabold text-teal-600">Present</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Today's Status ({date})</div>
+            <span className="inline-block text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full mt-1">
+              Official Entry Logged
+            </span>
+          </div>
         </div>
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="text-xl font-bold text-red-600">{absentCount}</div>
-          <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Absent</div>
+      ) : (
+        /* Teacher / Admin Class Overview */
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-xl font-bold text-slate-900">{total}</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Total Enrolled</div>
+          </div>
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-xl font-bold text-teal-600">{presentCount}</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Present</div>
+          </div>
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-xl font-bold text-red-600">{absentCount}</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Absent</div>
+          </div>
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="text-xl font-bold text-amber-600">{lateCount}</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Late</div>
+          </div>
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs col-span-2 sm:col-span-1">
+            <div className="text-xl font-bold text-blue-700">{presentRate}%</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Presence Index</div>
+          </div>
         </div>
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="text-xl font-bold text-amber-600">{lateCount}</div>
-          <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Late</div>
-        </div>
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs col-span-2 sm:col-span-1">
-          <div className="text-xl font-bold text-blue-700">{presentRate}%</div>
-          <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Presence Index</div>
-        </div>
-      </div>
+      )}
 
       {/* Roster Table */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-card overflow-hidden">
         <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-700">Class Roll Call Roster</span>
+            <span className="text-xs font-bold text-slate-700">
+              {isStudent ? 'Your Official Presence Ledger' : isParent ? `${selectedParentChild}'s Attendance Entry` : 'Class Roll Call Roster'}
+            </span>
             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
-              {grade} • Section {section}
+              {isStudent ? 'Grade 10 • Section A' : isParent ? (selectedParentChild === 'Arav' ? 'Grade 10 • Section A' : 'Grade 7 • Section A') : `${grade} • Section ${section}`}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {isSubmitted && !isUnlockedForEdit ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/70 px-2.5 py-1 rounded-lg border border-amber-200">
-                <Lock className="w-3.5 h-3.5" />
-                <span>Locked & Submitted</span>
-              </span>
+            {isTeacherOrAdmin ? (
+              isSubmitted && !isUnlockedForEdit ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/70 px-2.5 py-1 rounded-lg border border-amber-200">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Locked & Submitted</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  <Unlock className="w-3.5 h-3.5" />
+                  <span>Editing Active</span>
+                </span>
+              )
             ) : (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-1 rounded-lg border border-emerald-200">
-                <Unlock className="w-3.5 h-3.5" />
-                <span>Editing Active</span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
+                <CheckCircle className="w-3.5 h-3.5 text-teal-600" />
+                <span>CBSE Verified Record</span>
               </span>
             )}
           </div>
@@ -597,19 +833,19 @@ export const AttendancePage: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
-            {students.map((stu) => {
+            {displayStudents.map((stu) => {
               const currentStatus = attendanceMap[stu.id] || 'PRESENT';
-              const isSelf = isStudent && (stu.student_id === (user as any)?.studentId || stu.student_id === (user as any)?.student_id || stu.id === user?.id || user?.fullName?.toLowerCase().includes(stu.first_name.toLowerCase()));
-              const isMyChild = isParent && (stu.last_name === 'Patel' || stu.first_name === 'Arav' || stu.first_name === 'Diya');
+              const isSelf = isStudent;
+              const isMyChild = isParent;
 
               return (
                 <tr
                   key={stu.id}
                   className={`transition-colors ${
                     isSelf
-                      ? 'bg-blue-50/70 hover:bg-blue-50'
+                      ? 'bg-blue-50/50 hover:bg-blue-50/70'
                       : isMyChild
-                      ? 'bg-amber-50/60 hover:bg-amber-50/80'
+                      ? 'bg-amber-50/50 hover:bg-amber-50/70'
                       : 'hover:bg-slate-50/80'
                   }`}
                 >
@@ -689,7 +925,7 @@ export const AttendancePage: React.FC = () => {
                         {currentStatus === 'PRESENT' && (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200 shadow-2xs">
                             <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                            <span>Present</span>
+                            <span>Present (Verified by Class Teacher)</span>
                           </span>
                         )}
                         {currentStatus === 'ABSENT' && (
@@ -707,7 +943,7 @@ export const AttendancePage: React.FC = () => {
                         {currentStatus === 'EXCUSED' && (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
                             <Check className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Excused</span>
+                            <span>Excused (Medical Leave)</span>
                           </span>
                         )}
                       </div>
@@ -719,7 +955,7 @@ export const AttendancePage: React.FC = () => {
           </tbody>
         </table>
 
-        {/* Bottom Submission Bar */}
+        {/* Bottom Submission Bar for Teachers/Admins */}
         {isTeacherOrAdmin && (
           <div className="p-4 bg-slate-50/80 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-600">
