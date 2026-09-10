@@ -15,7 +15,7 @@ interface AppLayoutProps {
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const { user, logout, login } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -80,14 +80,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
     setSearchResults(sampleResults);
   }, [searchQuery]);
-
-  const handleRoleQuickSwitch = async (role: string) => {
-    if (role === 'SUPER_ADMIN') await login('admin@campusos.edu', 'Admin@2026');
-    else if (role === 'TEACHER') await login('priya.nair@campusos.edu', 'Teacher@2026');
-    else if (role === 'STUDENT') await login('arav.patel@campusos.edu', 'Student@2026');
-    else if (role === 'PARENT') await login('rajesh.patel@gmail.com', 'Parent@2026');
-    navigate('/dashboard');
-  };
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN';
 
@@ -267,47 +259,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Quick Demo Switcher Dropdown in Topbar */}
-            <div className="hidden md:flex items-center gap-1.5 text-xs">
-              <span className="text-[11px] text-slate-500 font-bold mr-1">Switch Role:</span>
-              <button
-                type="button"
-                onClick={() => handleRoleQuickSwitch('SUPER_ADMIN')}
-                className={`px-2 py-1 rounded-lg font-bold transition-all ${
-                  user?.role === 'SUPER_ADMIN' ? 'bg-navy-800 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleQuickSwitch('TEACHER')}
-                className={`px-2 py-1 rounded-lg font-bold transition-all ${
-                  user?.role === 'TEACHER' ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Teacher
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleQuickSwitch('STUDENT')}
-                className={`px-2 py-1 rounded-lg font-bold transition-all ${
-                  user?.role === 'STUDENT' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Student
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleQuickSwitch('PARENT')}
-                className={`px-2 py-1 rounded-lg font-bold transition-all ${
-                  user?.role === 'PARENT' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Parent
-              </button>
-            </div>
-
             {/* Notifications Menu */}
             <div className="relative">
               <button
