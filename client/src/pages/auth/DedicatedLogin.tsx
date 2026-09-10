@@ -445,35 +445,8 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
           {/* RIGHT COLUMN: Clean, Focused Sign-In Form */}
           <div className="lg:col-span-7 bg-white text-slate-900 p-7 sm:p-10 flex flex-col justify-between">
             <div>
-              {/* Role Switcher Tabs */}
-              <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl mb-6 border border-slate-200/80">
-                {(['admin', 'teacher', 'student', 'parent'] as PortalRole[]).map((r) => {
-                  const isActive = currentRole === r;
-                  const labels: Record<PortalRole, string> = {
-                    admin: 'Admin',
-                    teacher: 'Teacher',
-                    student: 'Student',
-                    parent: 'Parent',
-                  };
-                  return (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => navigate(ROLE_CONFIGS[r].portalPath)}
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-white text-slate-900 shadow-2xs border border-slate-200'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-                      }`}
-                    >
-                      {labels[r]}
-                    </button>
-                  );
-                })}
-              </div>
-
               {/* Institutional Role Header */}
-              <div className="mb-5 pb-4 border-b border-slate-100 flex items-center justify-between gap-3">
+              <div className="mb-6 pb-4 border-b border-slate-100 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-2xs flex-shrink-0 ${config.iconBg}`}>
                     {config.roleIcon}
