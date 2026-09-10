@@ -7,7 +7,7 @@ import {
   AlertCircle, Save, Download, RefreshCw, ChevronRight, Check,
   Shield, Lock, Unlock, Sparkles, UserCheck, KeyRound, Smartphone,
   Mail, ArrowRight, ShieldCheck, X, RotateCcw, Copy, Send, HelpCircle,
-  GraduationCap, Award, CheckCircle, FileText
+  GraduationCap, Award, CheckCircle, FileText, CalendarCheck, AlertTriangle
 } from 'lucide-react';
 
 export const AttendancePage: React.FC = () => {
@@ -30,9 +30,6 @@ export const AttendancePage: React.FC = () => {
     if (user?.role === 'TEACHER' && user.allottedClasses?.[0]?.grade) {
       return user.allottedClasses[0].grade;
     }
-    if (user?.role === 'STUDENT') {
-      return 'Grade 10';
-    }
     return 'Grade 10';
   });
 
@@ -49,15 +46,20 @@ export const AttendancePage: React.FC = () => {
     if (user?.role === 'TEACHER' && user.allottedClasses?.[0]?.section) {
       return user.allottedClasses[0].section;
     }
-    if (user?.role === 'STUDENT') {
-      return 'A';
-    }
     return 'A';
   });
 
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  // Default to today or latest recorded date (2026-09-10)
+  const [date, setDate] = useState('2026-09-10');
   const [students, setStudents] = useState<any[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED'>>({});
+  const [remarksMap, setRemarksMap] = useState<Record<string, string>>({});
+  const [markedByMap, setMarkedByMap] = useState<Record<string, string>>({});
+  const [isDateMarked, setIsDateMarked] = useState(false);
+  
+  // Historical records for student/parent logs
+  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState<string | null>(null);
 
@@ -108,32 +110,49 @@ export const AttendancePage: React.FC = () => {
       const targetGrade = isStudent ? 'Grade 10' : (isParent && selectedParentChild === 'Diya' ? 'Grade 7' : grade);
       const targetSection = isStudent ? 'A' : (isParent && selectedParentChild === 'Diya' ? 'A' : section);
 
-      const [stuRes, attRes] = await Promise.all([
+      const [stuRes, attRes, allAttRes] = await Promise.all([
         api.getStudents({ grade: targetGrade, section: targetSection }),
         api.getAttendance({ grade: targetGrade, section: targetSection, date }),
+        api.getAttendance({ grade: targetGrade, section: targetSection }),
       ]);
 
       const stuList = stuRes.students || [];
       setStudents(stuList);
+      setHistoryRecords(allAttRes.records || []);
 
-      const initialMap: Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED'> = {};
+      const newMap: Record<string, 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED'> = {};
+      const newRemarks: Record<string, string> = {};
+      const newMarkedBy: Record<string, string> = {};
       
-      // If attendance was already recorded for this date, pre-populate and mark as submitted
+      // If attendance was already recorded for this date, populate with exact record
       if (attRes.records && attRes.records.length > 0) {
         attRes.records.forEach((r: any) => {
-          initialMap[r.student_id] = r.status;
+          // Find matching student
+          const matchedStu = stuList.find((s: any) => s.id === r.student_id || s.student_id === r.student_id || `${s.first_name} ${s.last_name}`.toLowerCase() === r.student_name?.toLowerCase());
+          const key = matchedStu ? matchedStu.id : r.student_id;
+          newMap[key] = r.status;
+          if (r.remarks) newRemarks[key] = r.remarks;
+          if (r.marked_by) newMarkedBy[key] = r.marked_by;
         });
+        setIsDateMarked(true);
         setIsSubmitted(true);
       } else {
-        // Default everyone to PRESENT for rapid 1-click workflows
-        stuList.forEach((s: any) => {
-          initialMap[s.id] = 'PRESENT';
-        });
+        // Attendance was NOT marked for this date
+        setIsDateMarked(false);
         setIsSubmitted(false);
+        
+        // If teacher, default to PRESENT for initial quick fill
+        if (isTeacherOrAdmin) {
+          stuList.forEach((s: any) => {
+            newMap[s.id] = 'PRESENT';
+          });
+        }
       }
 
       setIsUnlockedForEdit(false);
-      setAttendanceMap(initialMap);
+      setAttendanceMap(newMap);
+      setRemarksMap(newRemarks);
+      setMarkedByMap(newMarkedBy);
     } catch (err) {
       console.error(err);
     }
@@ -167,7 +186,7 @@ export const AttendancePage: React.FC = () => {
   };
 
   const handleOtpDigitChange = (index: number, val: string) => {
-    const digit = val.slice(-1); // Only take last character
+    const digit = val.slice(-1);
     if (val && !/^\d+$/.test(digit)) return;
 
     const newDigits = [...otpDigits];
@@ -175,7 +194,6 @@ export const AttendancePage: React.FC = () => {
     setOtpDigits(newDigits);
     setOtpError(null);
 
-    // Auto-advance to next input if digit entered
     if (digit && index < 5) {
       otpInputRefs.current[index + 1]?.focus();
     }
@@ -272,7 +290,9 @@ export const AttendancePage: React.FC = () => {
       confetti({ particleCount: 75, spread: 70, origin: { y: 0.6 } });
       setIsSubmitted(true);
       setIsUnlockedForEdit(false);
+      setIsDateMarked(true);
       setSavedSuccess(res.message || '✅ Attendance submitted and locked successfully. Real-time SMS dispatched to parents.');
+      await loadRoster();
       setTimeout(() => setSavedSuccess(null), 6000);
     } catch (err: any) {
       alert(err.message || 'Failed to submit attendance.');
@@ -284,7 +304,6 @@ export const AttendancePage: React.FC = () => {
   // Determine scoped student list based on role
   const displayStudents = React.useMemo(() => {
     if (isStudent) {
-      // Show ONLY the logged-in student's own particular record
       const myId = (user as any)?.studentId || (user as any)?.student_id || 'STU-2026-8841';
       const myRecord = students.filter(
         (s) => s.student_id === myId || s.first_name?.toLowerCase() === 'arav' || s.id === user?.id
@@ -306,7 +325,6 @@ export const AttendancePage: React.FC = () => {
     }
 
     if (isParent) {
-      // Show ONLY the parent's linked children (Arav or Diya)
       if (selectedParentChild === 'Diya') {
         return [
           {
@@ -335,16 +353,31 @@ export const AttendancePage: React.FC = () => {
       ];
     }
 
-    // For Teachers and Admins: show all students of the selected grade/section
     return students;
   }, [students, isStudent, isParent, selectedParentChild, user]);
 
+  // Filter history records for student / parent log
+  const studentHistory = React.useMemo(() => {
+    if (!isStudent && !isParent) return [];
+    const targetName = isStudent ? 'arav' : (selectedParentChild === 'Diya' ? 'diya' : 'arav');
+    const filtered = historyRecords.filter(
+      (r) => r.student_name?.toLowerCase().includes(targetName) || (isStudent && r.student_id === 'stu_1') || (isParent && selectedParentChild === 'Diya' && r.student_id === 'stu_2')
+    );
+    // Sort descending by date
+    return filtered.sort((a, b) => b.date.localeCompare(a.date));
+  }, [historyRecords, isStudent, isParent, selectedParentChild]);
+
+  // Selected date status for student
+  const studentSelectedStatus = isStudent && displayStudents[0] ? attendanceMap[displayStudents[0].id] : null;
+  const studentSelectedRemark = isStudent && displayStudents[0] ? remarksMap[displayStudents[0].id] : null;
+  const studentSelectedMarker = isStudent && displayStudents[0] ? markedByMap[displayStudents[0].id] : 'Mrs. Priya Nair';
+
   const total = displayStudents.length;
-  const presentCount = displayStudents.filter((s) => (attendanceMap[s.id] || 'PRESENT') === 'PRESENT').length;
+  const presentCount = displayStudents.filter((s) => attendanceMap[s.id] === 'PRESENT').length;
   const absentCount = displayStudents.filter((s) => attendanceMap[s.id] === 'ABSENT').length;
   const lateCount = displayStudents.filter((s) => attendanceMap[s.id] === 'LATE').length;
   const excusedCount = displayStudents.filter((s) => attendanceMap[s.id] === 'EXCUSED').length;
-  const presentRate = isStudent ? '96.4' : total > 0 ? ((presentCount / total) * 100).toFixed(1) : '100.0';
+  const presentRate = isStudent ? '96.4' : total > 0 && isDateMarked ? ((presentCount / total) * 100).toFixed(1) : '100.0';
 
   const canDirectlyEdit = isTeacherOrAdmin && (!isSubmitted || isUnlockedForEdit);
 
@@ -501,7 +534,7 @@ export const AttendancePage: React.FC = () => {
           <GraduationCap className="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5" />
           <div className="leading-relaxed">
             <span className="font-extrabold text-blue-900">Personal Student Roster View: </span>
-            <span>This register is strictly scoped to your individual presence record for <strong>Grade 10 - Section A</strong>. Class teacher <strong>Mrs. Priya Nair</strong> verifies your daily presence during homeroom period at 08:15 AM.</span>
+            <span>This register is strictly scoped to your individual presence record for <strong>Grade 10 - Section A</strong>. Class teacher <strong>Mrs. Priya Nair</strong> verifies your daily presence during homeroom period at 08:15 AM. Use the date picker to inspect your presence record on any specific date.</span>
           </div>
         </div>
       )}
@@ -553,7 +586,6 @@ export const AttendancePage: React.FC = () => {
 
       {/* Selector & Quick Bulk Bar */}
       <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-card flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* If Student: Lock grade/section to their own class; only show date picker */}
         {isStudent ? (
           <div className="flex flex-wrap items-center gap-4 w-full justify-between">
             <div className="flex flex-wrap items-center gap-3">
@@ -573,14 +605,16 @@ export const AttendancePage: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Select Attendance Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600 cursor-pointer"
-              />
+            <div className="flex items-center gap-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Select Attendance Date</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 border border-slate-300 text-slate-800 outline-none focus:border-teal-600 cursor-pointer"
+                />
+              </div>
             </div>
           </div>
         ) : isParent ? (
@@ -690,7 +724,7 @@ export const AttendancePage: React.FC = () => {
 
       {/* Live Statistics Ticker */}
       {isStudent ? (
-        /* Student's Personal Presence Metrics */
+        /* Student's Personal Presence Metrics for the Selected Date & Academic Year */
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
             <div className="text-2xl font-extrabold text-blue-700">96.4%</div>
@@ -703,7 +737,7 @@ export const AttendancePage: React.FC = () => {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
             <div className="text-2xl font-extrabold text-teal-600">108</div>
             <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Days Present</div>
-            <span className="inline-block text-[10px] text-slate-500 mt-1">Out of 112 school days</span>
+            <span className="inline-block text-[10px] text-slate-500 mt-1">Academic Year 2025-26</span>
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
@@ -712,13 +746,40 @@ export const AttendancePage: React.FC = () => {
             <span className="inline-block text-[10px] text-slate-500 mt-1">Formal leave granted</span>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-            <div className="text-2xl font-extrabold text-slate-900">
-              <span className="text-teal-600">Present</span>
+          {/* Dynamic Status Card for Selected Date */}
+          <div className={`p-4 rounded-2xl border shadow-2xs ${
+            !isDateMarked
+              ? 'bg-slate-50 border-slate-200 text-slate-600'
+              : studentSelectedStatus === 'PRESENT'
+              ? 'bg-teal-50/70 border-teal-200 text-teal-900'
+              : studentSelectedStatus === 'LATE'
+              ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+              : studentSelectedStatus === 'EXCUSED'
+              ? 'bg-blue-50/70 border-blue-200 text-blue-900'
+              : 'bg-red-50/70 border-red-200 text-red-900'
+          }`}>
+            <div className="text-xl font-extrabold">
+              {!isDateMarked ? (
+                <span className="text-slate-500 font-bold text-sm flex items-center justify-center gap-1">
+                  <Clock className="w-4 h-4" /> Pending / Not Held
+                </span>
+              ) : studentSelectedStatus === 'PRESENT' ? (
+                <span className="text-teal-700">Present</span>
+              ) : studentSelectedStatus === 'LATE' ? (
+                <span className="text-amber-700">Late Arrival</span>
+              ) : studentSelectedStatus === 'EXCUSED' ? (
+                <span className="text-blue-700">Excused</span>
+              ) : (
+                <span className="text-red-700">Absent</span>
+              )}
             </div>
-            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Status on {date}</div>
-            <span className="inline-block text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full mt-1">
-              Marked by Mrs. Priya Nair
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">
+              Status on {date}
+            </div>
+            <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1">
+              {!isDateMarked
+                ? 'No roll call recorded'
+                : `Verified by ${studentSelectedMarker}`}
             </span>
           </div>
         </div>
@@ -754,10 +815,18 @@ export const AttendancePage: React.FC = () => {
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-            <div className="text-2xl font-extrabold text-teal-600">Present</div>
-            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">Today's Status ({date})</div>
-            <span className="inline-block text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full mt-1">
-              Official Entry Logged
+            <div className="text-xl font-extrabold">
+              {!isDateMarked ? (
+                <span className="text-slate-500 text-sm">Not Marked</span>
+              ) : (
+                <span className="text-teal-600">{attendanceMap[displayStudents[0]?.id] || 'Present'}</span>
+              )}
+            </div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mt-0.5">
+              Status on {date}
+            </div>
+            <span className="inline-block text-[10px] font-bold text-slate-500 mt-1">
+              {isDateMarked ? 'Official Entry Logged' : 'No record on file'}
             </span>
           </div>
         </div>
@@ -787,12 +856,16 @@ export const AttendancePage: React.FC = () => {
         </div>
       )}
 
-      {/* Roster Table */}
+      {/* Selected Date Attendance Register Table */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-card overflow-hidden">
         <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-700">
-              {isStudent ? 'Your Official Presence Ledger' : isParent ? `${selectedParentChild}'s Attendance Entry` : 'Class Roll Call Roster'}
+              {isStudent
+                ? `Official Presence Ledger for ${date}`
+                : isParent
+                ? `${selectedParentChild}'s Attendance Record on ${date}`
+                : `Class Roll Call Roster on ${date}`}
             </span>
             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
               {isStudent ? 'Grade 10 • Section A' : isParent ? (selectedParentChild === 'Arav' ? 'Grade 10 • Section A' : 'Grade 7 • Section A') : `${grade} • Section ${section}`}
@@ -801,21 +874,30 @@ export const AttendancePage: React.FC = () => {
 
           <div className="flex items-center gap-2">
             {isTeacherOrAdmin ? (
-              isSubmitted && !isUnlockedForEdit ? (
+              isDateMarked && !isUnlockedForEdit ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/70 px-2.5 py-1 rounded-lg border border-amber-200">
                   <Lock className="w-3.5 h-3.5" />
                   <span>Locked & Submitted</span>
                 </span>
-              ) : (
+              ) : isUnlockedForEdit ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-1 rounded-lg border border-emerald-200">
                   <Unlock className="w-3.5 h-3.5" />
                   <span>Editing Active</span>
                 </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-100/70 px-2.5 py-1 rounded-lg border border-blue-200">
+                  <span>Draft (Not Submitted)</span>
+                </span>
               )
-            ) : (
+            ) : isDateMarked ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
                 <CheckCircle className="w-3.5 h-3.5 text-teal-600" />
                 <span>CBSE Verified Record</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                <Clock className="w-3.5 h-3.5 text-slate-500" />
+                <span>Pending Teacher Roll Call</span>
               </span>
             )}
           </div>
@@ -834,7 +916,8 @@ export const AttendancePage: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
             {displayStudents.map((stu) => {
-              const currentStatus = attendanceMap[stu.id] || 'PRESENT';
+              const currentStatus = attendanceMap[stu.id];
+              const remark = remarksMap[stu.id];
               const isSelf = isStudent;
               const isMyChild = isParent;
 
@@ -920,31 +1003,45 @@ export const AttendancePage: React.FC = () => {
                         </button>
                       </div>
                     ) : (
-                      /* Read-Only Status Badges (Students & Parents) */
+                      /* Dynamic Read-Only Status Badges (Students & Parents) */
                       <div>
-                        {currentStatus === 'PRESENT' && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200 shadow-2xs">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                            <span>Present (Verified by Class Teacher)</span>
+                        {!isDateMarked || !currentStatus ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>No attendance marked for {date}</span>
                           </span>
-                        )}
-                        {currentStatus === 'ABSENT' && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200 shadow-2xs">
-                            <XCircle className="w-3.5 h-3.5 text-red-600" />
-                            <span>Absent</span>
-                          </span>
-                        )}
-                        {currentStatus === 'LATE' && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
-                            <Clock className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Late</span>
-                          </span>
-                        )}
-                        {currentStatus === 'EXCUSED' && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
-                            <Check className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Excused (Medical Leave)</span>
-                          </span>
+                        ) : currentStatus === 'PRESENT' ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200 shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
+                              <span>Present</span>
+                            </span>
+                            {remark && <span className="text-[11px] text-slate-500">({remark})</span>}
+                          </div>
+                        ) : currentStatus === 'LATE' ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Late Arrival</span>
+                            </span>
+                            {remark && <span className="text-[11px] text-amber-800 font-medium">({remark})</span>}
+                          </div>
+                        ) : currentStatus === 'EXCUSED' ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                              <Check className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Excused</span>
+                            </span>
+                            {remark && <span className="text-[11px] text-blue-800 font-medium">({remark})</span>}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200 shadow-2xs">
+                              <XCircle className="w-3.5 h-3.5 text-red-600" />
+                              <span>Absent</span>
+                            </span>
+                            {remark && <span className="text-[11px] text-red-800 font-medium">({remark})</span>}
+                          </div>
                         )}
                       </div>
                     )}
@@ -996,6 +1093,111 @@ export const AttendancePage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* 📅 STUDENT & PARENT HISTORICAL ATTENDANCE LOG (Day-by-Day Timeline)         */}
+      {/* ========================================================================= */}
+      {(isStudent || isParent) && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-card overflow-hidden">
+          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700">
+                <CalendarCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 font-display">
+                  {isStudent ? 'Daily Presence History Ledger' : `${selectedParentChild}'s Verified Presence Log`}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Click any date in the log to inspect historical records on that specific day
+                </p>
+              </div>
+            </div>
+
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+              {studentHistory.length} Recorded Days
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                <tr>
+                  <th className="py-3 px-6">Recorded Date</th>
+                  <th className="py-3 px-4">Homeroom Status</th>
+                  <th className="py-3 px-4">Verified By</th>
+                  <th className="py-3 px-6">Official Teacher Notes / Remarks</th>
+                  <th className="py-3 px-4 text-right">Inspect</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {studentHistory.map((rec) => {
+                  const isSelectedDate = rec.date === date;
+                  return (
+                    <tr
+                      key={rec.id}
+                      onClick={() => setDate(rec.date)}
+                      className={`cursor-pointer transition-colors ${
+                        isSelectedDate ? 'bg-teal-50/80 font-bold' : 'hover:bg-slate-50/80'
+                      }`}
+                    >
+                      <td className="py-3 px-6 font-bold text-slate-900 flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{rec.date}</span>
+                        {isSelectedDate && (
+                          <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-teal-600 text-white">
+                            Selected
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        {rec.status === 'PRESENT' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+                            <CheckCircle2 className="w-3 h-3 text-teal-600" />
+                            Present
+                          </span>
+                        )}
+                        {rec.status === 'LATE' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            Late Arrival
+                          </span>
+                        )}
+                        {rec.status === 'EXCUSED' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                            <Check className="w-3 h-3 text-blue-600" />
+                            Excused
+                          </span>
+                        )}
+                        {rec.status === 'ABSENT' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
+                            <XCircle className="w-3 h-3 text-red-600" />
+                            Absent
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">{rec.marked_by || 'Mrs. Priya Nair'}</td>
+                      <td className="py-3 px-6 text-slate-600 text-[11px]">{rec.remarks || 'On-Time Homeroom Presence'}</td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDate(rec.date);
+                          }}
+                          className="text-xs font-bold text-teal-700 hover:text-teal-900 hover:underline cursor-pointer"
+                        >
+                          View Day →
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 🔐 HIGH-SECURITY OTP VERIFICATION MODAL                                    */}
