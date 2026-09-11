@@ -213,6 +213,11 @@ class PureDatabase {
         return row.id === params[0];
       }
 
+      // 5b. IN clause lookup: WHERE id IN (?, ?, ...)
+      if (/WHERE\s+id\s+IN\s*\(/i.test(sql)) {
+        return params.includes(row.id) || params.includes(row.student_id);
+      }
+
       // 6. Generic parameter matching
       let matches = true;
       let curParam = 0;
