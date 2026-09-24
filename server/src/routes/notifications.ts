@@ -54,4 +54,28 @@ router.put('/read-all', authMiddleware, (req: Request, res: Response) => {
   }
 });
 
+// Delete single notification
+router.delete('/:id', authMiddleware, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const db = getDb();
+    db.prepare('DELETE FROM notifications WHERE id = ?').run(id);
+    return res.json({ message: 'Notification removed.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to delete notification.' });
+  }
+});
+
+// Clear all notifications for user
+router.delete('/', authMiddleware, (req: Request, res: Response) => {
+  try {
+    const db = getDb();
+    const userId = req.user!.id;
+    db.prepare('DELETE FROM notifications WHERE user_id = ? OR target_role = ? OR target_role = "ALL"').run(userId, req.user!.role);
+    return res.json({ message: 'Notifications cleared.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to clear notifications.' });
+  }
+});
+
 export default router;

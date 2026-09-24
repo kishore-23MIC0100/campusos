@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { BrandLogo } from '../brand/BrandLogo';
+import { NotificationCenter } from '../notifications/NotificationCenter';
 import {
   Shield, LayoutDashboard, Users, GraduationCap, HeartHandshake, CheckSquare,
   CalendarDays, BookOpen, Clock, Calendar, Megaphone, Sparkles, TrendingUp,
@@ -259,55 +260,29 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Notifications Menu */}
+            {/* Notifications Menu Trigger */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowNotifMenu(!showNotifMenu)}
-                className="relative p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                title="Notifications"
+                className="relative p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 hover:text-teal-700 transition-all cursor-pointer group"
+                title="Open Notification Center"
               >
-                <Bell className="w-5 h-5" />
+                <Bell className="w-5 h-5 group-hover:rotate-12 transition-transform" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
+                  <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-amber-500 text-[9px] font-extrabold text-white ring-2 ring-white animate-pulse">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
                 )}
               </button>
 
               {showNotifMenu && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-scaleIn">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-slate-900">Notifications</h4>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
-                        {unreadCount} Unread
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await api.markAllNotificationsRead();
-                        loadNotifications();
-                      }}
-                      className="text-xs text-teal-700 hover:underline font-bold"
-                    >
-                      Mark all read
-                    </button>
-                  </div>
-
-                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto mt-2">
-                    {notifications.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-slate-500 font-medium">No new notifications.</div>
-                    ) : (
-                      notifications.map((n) => (
-                        <div key={n.id} className="py-2.5 space-y-1">
-                          <div className="text-xs font-bold text-slate-900">{n.title}</div>
-                          <div className="text-xs text-slate-600 leading-relaxed font-normal">{n.message}</div>
-                          <div className="text-[10px] text-slate-500 font-medium">{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <NotificationCenter
+                  notifications={notifications}
+                  unreadCount={unreadCount}
+                  onRefresh={loadNotifications}
+                  onClose={() => setShowNotifMenu(false)}
+                />
               )}
             </div>
 

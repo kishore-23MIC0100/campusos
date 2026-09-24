@@ -1,25 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { api, User } from '../../services/api';
-import confetti from 'canvas-confetti';
+import { useToast } from '../../context/ToastContext';
 import {
   Users, Key, Search, Filter, CheckCircle2, XCircle, Clock,
   Shield, Check, X, ArrowRight, ShieldAlert, Lock, Unlock
 } from 'lucide-react';
 
 export const UsersAndApprovalsPage: React.FC = () => {
+  const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [actionAlert, setActionAlert] = useState<string | null>(null);
 
   const loadUsers = async () => {
     try {
       const res = await api.getUsers({ status: statusFilter, role: roleFilter, search });
       setUsers(res.users || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      toast.error(err.message || 'Failed to load user directory.', 'Directory Error');
     } finally {
       setLoading(false);
     }
@@ -32,35 +33,36 @@ export const UsersAndApprovalsPage: React.FC = () => {
   const handleApprove = async (id: string, name: string) => {
     try {
       await api.approveUser(id);
-      confetti({ particleCount: 70, spread: 70 });
-      setActionAlert(`Access granted for ${name}. Account status: APPROVED.`);
+      toast.success(`Access granted for ${name}. Account status is now APPROVED.`, 'User Approved', { confetti: true });
       loadUsers();
-      setTimeout(() => setActionAlert(null), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to approve user.');
+      toast.error(err.message || 'Failed to approve user.', 'Approval Error');
     }
   };
 
   const handleReject = async (id: string, name: string) => {
-    const reason = prompt(`Reason for declining access for ${name}:`);
-    if (reason === null) return;
     try {
-      await api.rejectUser(id, reason);
-      setActionAlert(`Declined access for ${name}.`);
+      await api.rejectUser(id, 'Declined by Administrator');
+      toast.info(`Access request declined for ${name}.`, 'Request Declined');
       loadUsers();
-      setTimeout(() => setActionAlert(null), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to reject user.');
+      toast.error(err.message || 'Failed to reject user.', 'Action Error');
     }
   };
 
-  const handleToggleStatus = async (id: string, currentStatus: string) => {
+  const handleToggleStatus = async (id: string, currentStatus: string, name: string) => {
     const newStatus = currentStatus === 'APPROVED' ? 'DISABLED' : 'APPROVED';
     try {
       await api.updateUserStatus(id, newStatus);
+      if (newStatus === 'APPROVED') {
+        toast.success(`Account enabled for ${name}.`, 'Account Activated');
+      } else {
+        toast.warning(`Account disabled for ${name}.`, 'Account Suspended');
+      }
       loadUsers();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      toast.error(err.message || 'Failed to update user status.', 'Status Error');
     }
   };
 
@@ -81,13 +83,6 @@ export const UsersAndApprovalsPage: React.FC = () => {
           </p>
         </div>
       </div>
-
-      {actionAlert && (
-        <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-900 text-xs font-semibold flex items-center gap-2 shadow-sm animate-slideDown">
-          <CheckCircle2 className="w-4 h-4 text-teal-600" />
-          <span>{actionAlert}</span>
-        </div>
-      )}
 
       {/* Filter / Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -201,7 +196,7 @@ export const UsersAndApprovalsPage: React.FC = () => {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => handleToggleStatus(u.id, u.status)}
+                      onClick={() => handleToggleStatus(u.id, u.status, u.fullName)}
                       className="text-xs font-semibold text-slate-400 hover:text-slate-700"
                     >
                       {u.status === 'APPROVED' ? 'Lock Account' : 'Unlock'}

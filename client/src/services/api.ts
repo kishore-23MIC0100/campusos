@@ -378,6 +378,14 @@ export const api = {
     return apiFetch<{ message: string }>('/notifications/read-all', { method: 'PUT' });
   },
 
+  async deleteNotification(id: string) {
+    return apiFetch<{ message: string }>(`/notifications/${id}`, { method: 'DELETE' });
+  },
+
+  async clearAllNotifications() {
+    return apiFetch<{ message: string }>('/notifications', { method: 'DELETE' });
+  },
+
   // Reports
   async getInstitutionalReport() {
     return apiFetch<{ metrics: any; institution: any }>('/reports/summary');

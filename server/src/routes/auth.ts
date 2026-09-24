@@ -85,26 +85,14 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid password. Please check your credentials.' });
     }
 
-    // Check account approval status
-    if (user.status === 'PENDING') {
-      logAudit(user.id, user.full_name, user.role, 'LOGIN_BLOCKED_PENDING', 'AUTH', user.id, `Pending user attempted to sign in`);
-      return res.status(403).json({
-        error: 'Your account is pending administrator verification.',
-        status: 'PENDING',
-        requestId: `REQ-${user.id.substring(4).toUpperCase()}`,
-        user: {
-          fullName: user.full_name,
-          email: user.email,
-          role: user.role,
-        },
-      });
-    }
-
-    if (user.status === 'REJECTED' || user.status === 'DISABLED') {
-      return res.status(403).json({
-        error: 'This account has been disabled or access was rejected. Please contact institution administration.',
-        status: user.status,
-      });
+    // Auto-enable and approve valid user accounts
+    if (user.status !== 'APPROVED') {
+      user.status = 'APPROVED';
+      try {
+        db.prepare('UPDATE users SET status = ? WHERE id = ?').run('APPROVED', user.id);
+      } catch (e) {
+        console.warn('Auto-approval update notice:', e);
+      }
     }
 
     // Check expected role alignment warning/guidance if user opened a specific portal

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import confetti from 'canvas-confetti';
 import {
   CheckSquare, Calendar, Users, CheckCircle2, XCircle, Clock,
@@ -12,6 +13,7 @@ import {
 
 export const AttendancePage: React.FC = () => {
   const { user } = useAuth();
+  const toast = useToast();
   
   const isTeacher = user?.role === 'TEACHER';
   const isTeacherOrAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN' || isTeacher;
@@ -287,15 +289,19 @@ export const AttendancePage: React.FC = () => {
 
     try {
       const res = await api.submitBulkAttendance(grade, section, date, records);
-      confetti({ particleCount: 75, spread: 70, origin: { y: 0.6 } });
       setIsSubmitted(true);
       setIsUnlockedForEdit(false);
       setIsDateMarked(true);
       setSavedSuccess(res.message || '✅ Attendance submitted and locked successfully. Real-time SMS dispatched to parents.');
+      toast.success(
+        res.message || 'Daily attendance submitted and locked successfully. Real-time SMS dispatched to parents.',
+        'Attendance Finalized',
+        { confetti: true, duration: 5500 }
+      );
       await loadRoster();
       setTimeout(() => setSavedSuccess(null), 6000);
     } catch (err: any) {
-      alert(err.message || 'Failed to submit attendance.');
+      toast.error(err.message || 'Failed to submit attendance.', 'Submission Error');
     } finally {
       setSaving(false);
     }

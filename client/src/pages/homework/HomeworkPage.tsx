@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import {
   BookOpen, Plus, Search, Calendar, FileText, CheckCircle2,
   Clock, AlertCircle, X, Download, Upload, ArrowRight
@@ -8,6 +9,7 @@ import {
 
 export const HomeworkPage: React.FC = () => {
   const { user } = useAuth();
+  const toast = useToast();
   const [homeworkList, setHomeworkList] = useState<any[]>([]);
   const [grade, setGrade] = useState('ALL');
   const [subject, setSubject] = useState('ALL');
@@ -120,8 +122,9 @@ export const HomeworkPage: React.FC = () => {
       setNewTitle('');
       setNewDescription('');
       loadHomework();
+      toast.success('Homework assignment published and broadcasted to class students.', 'Assignment Created', { confetti: true });
     } catch (err: any) {
-      alert(err.message || 'Failed to publish homework.');
+      toast.error(err.message || 'Failed to publish homework.', 'Publish Error');
     } finally {
       setSubmitting(false);
     }
@@ -137,9 +140,9 @@ export const HomeworkPage: React.FC = () => {
       setShowSubmitModal(null);
       setSolutionNotes('');
       loadHomework();
-      alert('Assignment solution submitted to faculty grading queue.');
+      toast.success('Assignment solution submitted to faculty grading queue.', 'Submission Received', { confetti: true });
     } catch (err: any) {
-      alert(err.message || 'Failed to submit solution.');
+      toast.error(err.message || 'Failed to submit solution.', 'Submission Error');
     } finally {
       setSubmittingSolution(false);
     }

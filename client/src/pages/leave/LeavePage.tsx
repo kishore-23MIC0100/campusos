@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import confetti from 'canvas-confetti';
+import { useToast } from '../../context/ToastContext';
 import {
   CalendarDays, Plus, Search, Filter, CheckCircle2, XCircle,
-  Clock, AlertCircle, X, ChevronRight, Check
+  Clock, AlertCircle, X, ChevronRight, Check, Send, Sparkles
 } from 'lucide-react';
 
 export const LeavePage: React.FC = () => {
   const { user } = useAuth();
+  const toast = useToast();
   const [leaves, setLeaves] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showApplyModal, setShowApplyModal] = useState(false);
+
+  // Reject modal state
+  const [rejectModal, setRejectModal] = useState<{ id: string; name: string } | null>(null);
+  const [rejectRemarks, setRejectRemarks] = useState('');
 
   // New leave form
   const [leaveType, setLeaveType] = useState('CASUAL');
@@ -30,8 +35,9 @@ export const LeavePage: React.FC = () => {
       const res = await api.getLeaves({ status: statusFilter, search });
       setLeaves(res.leaves || []);
       setAnalytics(res.analytics);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      toast.error(err.message || 'Failed to load leave records.');
     } finally {
       setLoading(false);
     }
@@ -43,7 +49,10 @@ export const LeavePage: React.FC = () => {
 
   const handleApplyLeave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reason) return;
+    if (!reason.trim()) {
+      toast.warning('Please specify the detailed reason for your leave request.', 'Missing Reason');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -59,9 +68,16 @@ export const LeavePage: React.FC = () => {
       setShowApplyModal(false);
       setReason('');
       loadLeaves();
-      alert('Leave application submitted to administration.');
+      toast.success(
+        'Leave application submitted to administration for sanction.',
+        'Application Submitted',
+        {
+          confetti: true,
+          duration: 5000,
+        }
+      );
     } catch (err: any) {
-      alert(err.message || 'Failed to submit leave application.');
+      toast.error(err.message || 'Failed to submit leave application.', 'Submission Error');
     } finally {
       setSubmitting(false);
     }
@@ -70,21 +86,28 @@ export const LeavePage: React.FC = () => {
   const handleApprove = async (id: string, name: string) => {
     try {
       await api.approveLeave(id, 'Approved by institutional authority.');
-      confetti({ particleCount: 50, spread: 60 });
+      toast.success(`Leave request for ${name} has been approved.`, 'Leave Sanctioned', { confetti: true });
       loadLeaves();
     } catch (err: any) {
-      alert(err.message || 'Failed to approve leave.');
+      toast.error(err.message || 'Failed to approve leave.', 'Action Failed');
     }
   };
 
-  const handleReject = async (id: string, name: string) => {
-    const remarks = prompt(`Provide remark for declining ${name}'s leave:`);
-    if (remarks === null) return;
+  const handleOpenReject = (id: string, name: string) => {
+    setRejectRemarks('');
+    setRejectModal({ id, name });
+  };
+
+  const handleConfirmReject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectModal) return;
     try {
-      await api.rejectLeave(id, remarks);
+      await api.rejectLeave(rejectModal.id, rejectRemarks || 'Declined as per policy.');
+      toast.info(`Leave request for ${rejectModal.name} has been declined.`, 'Request Declined');
+      setRejectModal(null);
       loadLeaves();
     } catch (err: any) {
-      alert(err.message || 'Failed to decline leave.');
+      toast.error(err.message || 'Failed to decline leave.', 'Action Failed');
     }
   };
 
@@ -213,15 +236,15 @@ export const LeavePage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleReject(lv.id, lv.applicant_name)}
-                    className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-700 text-xs font-semibold border border-slate-200"
+                    onClick={() => handleOpenReject(lv.id, lv.applicant_name)}
+                    className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-700 text-xs font-semibold border border-slate-200 transition-colors"
                   >
                     Decline
                   </button>
                   <button
                     type="button"
                     onClick={() => handleApprove(lv.id, lv.applicant_name)}
-                    className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>Approve Leave</span>
@@ -310,6 +333,61 @@ export const LeavePage: React.FC = () => {
               >
                 {submitting ? 'Submitting...' : 'Submit Application to Administration'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Decline Leave Modal */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 relative animate-scaleUp">
+            <button
+              type="button"
+              onClick={() => setRejectModal(null)}
+              className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-rose-600 mb-1">
+              <XCircle className="w-4 h-4" />
+              <span>Administrative Review</span>
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 font-display mb-1">Decline Leave Request</h3>
+            <p className="text-xs text-slate-500 mb-5">
+              Please specify the administrative reason for declining <span className="font-semibold text-slate-800">{rejectModal.name}</span>'s application.
+            </p>
+
+            <form onSubmit={handleConfirmReject} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Official Reviewer Remark *</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={rejectRemarks}
+                  onChange={(e) => setRejectRemarks(e.target.value)}
+                  placeholder="e.g., Exam schedule conflict, insufficient leave quota, or required during annual inspections..."
+                  className="glass-input w-full px-3.5 py-2.5 text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectModal(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <XCircle className="w-4 h-4" />
+                  <span>Confirm Decline</span>
+                </button>
+              </div>
             </form>
           </div>
         </div>
