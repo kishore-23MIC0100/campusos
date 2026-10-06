@@ -1,6 +1,7 @@
 {
   "name": "campusos",
   "version": "1.0.0",
+  "type": "module",
   "description": "CampusOS — Intelligent School Management Platform",
   "scripts": {
     "dev": "npm run dev:server & npm run dev:client",
@@ -8,6 +9,15 @@
     "dev:client": "cd client && npm run dev -- --host 0.0.0.0 --port 5173",
     "build": "cd client && npm install && npm run build",
     "start": "cd server && npm start"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
   },
   "keywords": [
     "school-management",

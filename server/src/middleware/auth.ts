@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { getDb } from '../db.js';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'campusos-super-secret-enterprise-jwt-key-2026';
+const getJwtSecret = () => process.env.JWT_SECRET || 'campusos-super-secret-enterprise-jwt-key-2026';
 
 export interface AuthenticatedUser {
   id: string;
@@ -37,7 +37,7 @@ export function generateToken(user: any) {
       department: user.department,
       phone: user.phone,
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '7d' }
   );
 }
@@ -50,7 +50,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthenticatedUser;
     
     // Check if user still exists and is APPROVED in database
     const db = getDb();

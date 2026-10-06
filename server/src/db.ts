@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { Pool, type PoolClient } from 'pg';
 
 export interface DatabaseState {
   users: any[];
@@ -74,11 +75,103 @@ class PureDatabase {
   private filePath: string;
   private data: DatabaseState;
   private saveTimeout: NodeJS.Timeout | null = null;
+  private readonly usesPostgres = Boolean(process.env.DATABASE_URL);
+  private pool: Pool | null = null;
+  private dirty = false;
+  private requestTail: Promise<void> = Promise.resolve();
 
   constructor() {
     this.dataDir = path.resolve(process.cwd(), 'data');
     this.filePath = path.join(this.dataDir, 'campusos_data.json');
-    this.data = this.loadData();
+    // Production must never fall back to the checked-in/local JSON database.
+    this.data = this.usesPostgres || process.env.VERCEL
+      ? JSON.parse(JSON.stringify(defaultState))
+      : this.loadData();
+  }
+
+  public hasUsers() {
+    return this.data.users.length > 0;
+  }
+
+  private getPool() {
+    if (!this.pool) {
+      const connectionString = process.env.DATABASE_URL;
+      if (!connectionString) throw new Error('DATABASE_URL is required for the deployed CampusOS API.');
+      this.pool = new Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false },
+        max: 3,
+        connectionTimeoutMillis: 10000,
+      });
+    }
+    return this.pool;
+  }
+
+  /**
+   * A request-scoped lock makes the JSON-backed query adapter safe across
+   * Vercel function instances while retaining the existing synchronous route API.
+   */
+  public async beginRequest(): Promise<() => Promise<void>> {
+    if (!this.usesPostgres) {
+      if (process.env.VERCEL) throw new Error('DATABASE_URL is required for the deployed CampusOS API.');
+      return async () => {};
+    }
+
+    let releaseQueue!: () => void;
+    const previous = this.requestTail;
+    this.requestTail = new Promise<void>((resolve) => { releaseQueue = resolve; });
+    await previous;
+
+    let client: PoolClient | undefined;
+    try {
+      client = await this.getPool().connect();
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS campusos_state (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          state JSONB NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock($1)', [694327]);
+      const result = await client.query('SELECT state FROM campusos_state WHERE id = 1 FOR UPDATE');
+      if (result.rows[0]?.state) {
+        const saved = typeof result.rows[0].state === 'string'
+          ? JSON.parse(result.rows[0].state)
+          : result.rows[0].state;
+        this.data = { ...defaultState, ...saved };
+      } else {
+        this.data = JSON.parse(JSON.stringify(defaultState));
+      }
+      this.dirty = false;
+
+      return async () => {
+        try {
+          if (this.dirty) {
+            await client!.query(
+              `INSERT INTO campusos_state (id, state, updated_at)
+               VALUES (1, $1::jsonb, NOW())
+               ON CONFLICT (id) DO UPDATE SET state = EXCLUDED.state, updated_at = NOW()`,
+              [JSON.stringify(this.data)],
+            );
+          }
+          await client!.query('COMMIT');
+        } catch (error) {
+          await client!.query('ROLLBACK').catch(() => {});
+          throw error;
+        } finally {
+          client!.release();
+          releaseQueue();
+        }
+      };
+    } catch (error) {
+      if (client) {
+        await client.query('ROLLBACK').catch(() => {});
+        client.release();
+      }
+      releaseQueue();
+      throw error;
+    }
   }
 
   private loadData(): DatabaseState {
@@ -97,6 +190,10 @@ class PureDatabase {
   }
 
   public save() {
+    if (this.usesPostgres) {
+      this.dirty = true;
+      return;
+    }
     try {
       if (!fs.existsSync(this.dataDir)) {
         fs.mkdirSync(this.dataDir, { recursive: true });
@@ -108,6 +205,10 @@ class PureDatabase {
   }
 
   public scheduleSave() {
+    if (this.usesPostgres) {
+      this.dirty = true;
+      return;
+    }
     if (this.saveTimeout) clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => this.save(), 50);
   }

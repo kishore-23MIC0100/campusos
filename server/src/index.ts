@@ -31,7 +31,6 @@ import transportRoutes from './routes/transport.js';
 dotenv.config();
 
 const app = express();
-const server = http.createServer(app);
 const PORT = process.env.PORT || 4000;
 
 // Middleware
@@ -41,22 +40,62 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '8mb' }));
 
-// Initialize Database & Seed data
-initDatabase();
-seedDatabase().catch(err => console.error('[Seed Error]', err));
-
-// WebSocket Server for Realtime Alerts
-const wss = new WebSocketServer({ server, path: '/ws' });
 const clients = new Set<WebSocket>();
 
-wss.on('connection', (ws) => {
-  clients.add(ws);
-  ws.send(JSON.stringify({ type: 'CONNECTED', message: 'CampusOS Realtime Event Stream Active' }));
+if (!process.env.VERCEL) {
+  // Local development keeps the existing JSON-backed database and WebSocket server.
+  initDatabase();
+  seedDatabase().catch(err => console.error('[Seed Error]', err));
 
-  ws.on('close', () => {
-    clients.delete(ws);
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ server, path: '/ws' });
+  wss.on('connection', (ws) => {
+    clients.add(ws);
+    ws.send(JSON.stringify({ type: 'CONNECTED', message: 'CampusOS Realtime Event Stream Active' }));
+    ws.on('close', () => clients.delete(ws));
   });
-});
+
+  server.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`  CampusOS Core Backend API Engine running on :${PORT}`);
+    console.log(`  WebSockets active at ws://localhost:${PORT}/ws`);
+    console.log(`====================================================`);
+  });
+} else {
+  // Vercel serverless functions have no durable local disk. Serialize each API
+  // request through Neon and commit the state before the response is closed.
+  app.use('/api', async (req, res, next) => {
+    const db = initDatabase();
+    let finishRequest: (() => Promise<void>) | null = null;
+    try {
+      finishRequest = await db.beginRequest();
+      if (!db.hasUsers()) await seedDatabase();
+
+      const originalEnd = res.end.bind(res);
+      let ending = false;
+      res.end = ((...args: any[]) => {
+        if (ending) return res;
+        ending = true;
+        void finishRequest!()
+          .then(() => originalEnd(...args as Parameters<typeof res.end>))
+          .catch((error) => {
+            console.error('[Database Commit Error]', error);
+            if (!res.headersSent) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              return originalEnd(JSON.stringify({ error: 'Could not save CampusOS data. Please retry.' }));
+            }
+            return originalEnd(...args as Parameters<typeof res.end>);
+          });
+        return res;
+      }) as typeof res.end;
+      next();
+    } catch (error) {
+      if (finishRequest) await finishRequest().catch((commitError) => console.error('[Database Release Error]', commitError));
+      next(error);
+    }
+  });
+}
 
 export function broadcastEvent(event: { type: string; payload: any }) {
   const message = JSON.stringify(event);
@@ -106,9 +145,4 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Internal server error. Institutional logs updated.' });
 });
 
-server.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`  CampusOS Core Backend API Engine running on :${PORT}`);
-  console.log(`  WebSockets active at ws://localhost:${PORT}/ws`);
-  console.log(`====================================================`);
-});
+export default app;
