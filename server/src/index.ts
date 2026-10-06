@@ -23,6 +23,10 @@ import schoolRoutes from './routes/school.js';
 import auditRoutes from './routes/audit.js';
 import notificationsRoutes from './routes/notifications.js';
 import reportsRoutes from './routes/reports.js';
+import payrollRoutes from './routes/payroll.js';
+import staffRoutes from './routes/staff.js';
+import assessmentsRoutes from './routes/assessments.js';
+import transportRoutes from './routes/transport.js';
 
 dotenv.config();
 
@@ -35,7 +39,7 @@ app.use(cors({
   origin: true,
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
 
 // Initialize Database & Seed data
 initDatabase();
@@ -91,6 +95,10 @@ app.use('/api/school', schoolRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/payroll', payrollRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/assessments', assessmentsRoutes);
+app.use('/api/transport', transportRoutes);
 
 // Centralized error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

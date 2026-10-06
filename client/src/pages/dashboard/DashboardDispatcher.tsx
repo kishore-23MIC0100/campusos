@@ -27,14 +27,14 @@ export const DashboardDispatcher: React.FC = () => {
   switch (user.role) {
     case 'SUPER_ADMIN':
     case 'SCHOOL_ADMIN':
-      return <AdminDashboard />;
+      return <div className="campus-dashboard-page"><AdminDashboard /></div>;
     case 'TEACHER':
-      return <TeacherDashboard />;
+      return <div className="campus-dashboard-page"><TeacherDashboard /></div>;
     case 'STUDENT':
-      return <StudentDashboard />;
+      return <div className="campus-dashboard-page"><StudentDashboard /></div>;
     case 'PARENT':
-      return <ParentDashboard />;
+      return <div className="campus-dashboard-page"><ParentDashboard /></div>;
     default:
-      return <AdminDashboard />;
+      return <div className="campus-dashboard-page"><AdminDashboard /></div>;
   }
 };

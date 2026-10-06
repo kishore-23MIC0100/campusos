@@ -25,6 +25,14 @@ export interface DatabaseState {
   audit_logs: any[];
   notifications: any[];
   rooms_facilities: any[];
+  staff_details: any[];
+  payrolls: any[];
+  assessments: any[];
+  assessment_marks: any[];
+  transport_routes: any[];
+  transport_vehicles: any[];
+  transport_stops: any[];
+  transport_allocations: any[];
 }
 
 const defaultState: DatabaseState = {
@@ -51,6 +59,14 @@ const defaultState: DatabaseState = {
   audit_logs: [],
   notifications: [],
   rooms_facilities: [],
+  staff_details: [],
+  payrolls: [],
+  assessments: [],
+  assessment_marks: [],
+  transport_routes: [],
+  transport_vehicles: [],
+  transport_stops: [],
+  transport_allocations: [],
 };
 
 class PureDatabase {
@@ -287,18 +303,24 @@ class PureDatabase {
         return row.parent_id === params[0] || (row.parent_name && row.parent_name.toLowerCase().includes(term));
       }
 
-      // Single parent / student ID check
-      if (/WHERE\s+homework_id\s*=\s*\?/i.test(sql)) {
-        return row.homework_id === params[0];
+      // Assessment, transport, payroll filters
+      if (/WHERE\s+assessment_id\s*=\s*\?/i.test(sql)) {
+        return row.assessment_id === params[0];
       }
-      if (/WHERE\s+student_id\s*=\s*\?/i.test(sql)) {
-        return row.student_id === params[0];
+      if (/WHERE\s+route_id\s*=\s*\?/i.test(sql)) {
+        return row.route_id === params[0];
       }
-      if (/WHERE\s+user_id\s*=\s*\?/i.test(sql)) {
-        return row.user_id === params[0];
+      if (/WHERE\s+employee_id\s*=\s*\?/i.test(sql)) {
+        return row.employee_id === params[0];
       }
-      if (/WHERE\s+grade\s*=\s*\?\s*AND\s*section\s*=\s*\?/i.test(sql)) {
-        return row.grade === params[0] && row.section === params[1];
+      if (/WHERE\s+faculty_id\s*=\s*\?/i.test(sql)) {
+        return row.faculty_id === params[0];
+      }
+      if (/assessment_id\s*=\s*\?\s*AND\s*student_id\s*=\s*\?/i.test(sql)) {
+        return row.assessment_id === params[0] && row.student_id === params[1];
+      }
+      if (/month\s*=\s*\?\s*AND\s*year\s*=\s*\?/i.test(sql)) {
+        return String(row.month).toLowerCase() === String(params[0]).toLowerCase() && Number(row.year) === Number(params[1]);
       }
 
       return matches;
@@ -400,9 +422,17 @@ class PureDatabase {
         this.data[tableName] = (this.data[tableName] || []).filter(
           r => !(r.grade === params[0] && r.section === params[1] && r.date === params[2])
         );
-      } else if (/WHERE\s+homework_id\s*=\s*\?\s*AND\s*student_id\s*=\s*\?/i.test(trimmed)) {
+      } else if (/WHERE\s+homework_id\s*=\s*\?/i.test(trimmed)) {
         this.data[tableName] = (this.data[tableName] || []).filter(
-          r => !(r.homework_id === params[0] && r.student_id === params[1])
+          r => r.homework_id !== params[0]
+        );
+      } else if (/WHERE\s+assessment_id\s*=\s*\?/i.test(trimmed)) {
+        this.data[tableName] = (this.data[tableName] || []).filter(
+          r => r.assessment_id !== params[0]
+        );
+      } else if (/WHERE\s+route_id\s*=\s*\?/i.test(trimmed)) {
+        this.data[tableName] = (this.data[tableName] || []).filter(
+          r => r.route_id !== params[0]
         );
       }
 

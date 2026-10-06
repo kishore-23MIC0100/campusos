@@ -25,6 +25,11 @@ import { RolesAndPermissionsPage } from './pages/admin/RolesAndPermissionsPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
+import { PayrollPage } from './pages/payroll/PayrollPage';
+import { StaffManagementPage } from './pages/staff/StaffManagementPage';
+import { AssessmentsPage } from './pages/assessments/AssessmentsPage';
+import { TransportPage } from './pages/transport/TransportPage';
+import { AssessmentPortalPage } from './pages/assessments/AssessmentPortalPage';
 
 // Protected Route Wrapper
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -46,6 +51,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
 
   return <AppLayout>{children}</AppLayout>;
+};
+
+const ProtectedStandaloneRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-semibold text-slate-500">Preparing assessment portal…</div>;
+  if (!user) return <Navigate to="/student/login" replace />;
+  if (user.role !== 'STUDENT') return <Navigate to="/assessments" replace />;
+  return <>{children}</>;
 };
 
 export function App() {
@@ -186,6 +199,40 @@ export function App() {
             element={
               <ProtectedRoute>
                 <ReportsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payroll"
+            element={
+              <ProtectedRoute>
+                <PayrollPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff-management"
+            element={
+              <ProtectedRoute>
+                <StaffManagementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assessments"
+            element={
+              <ProtectedRoute>
+                <AssessmentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/assessment-portal" element={<ProtectedStandaloneRoute><AssessmentPortalPage /></ProtectedStandaloneRoute>} />
+          <Route path="/assessment-portal/:assessmentId" element={<ProtectedStandaloneRoute><AssessmentPortalPage /></ProtectedStandaloneRoute>} />
+          <Route
+            path="/transport"
+            element={
+              <ProtectedRoute>
+                <TransportPage />
               </ProtectedRoute>
             }
           />

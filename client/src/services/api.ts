@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000/api';
 
 export interface User {
   id: string;
@@ -389,5 +389,216 @@ export const api = {
   // Reports
   async getInstitutionalReport() {
     return apiFetch<{ metrics: any; institution: any }>('/reports/summary');
+  },
+
+  // Payroll Management
+  async getPayrollSummary() {
+    return apiFetch<{
+      month: string;
+      year: number;
+      totalStaffCount: number;
+      processedCount: number;
+      paidCount: number;
+      pendingCount: number;
+      totalDisbursed: number;
+      pendingDisbursements: number;
+      totalDeductions: number;
+      departmentBreakdown: Record<string, number>;
+    }>('/payroll/summary');
+  },
+
+  async getPayrollRecords(params?: { month?: string; year?: number; department?: string; status?: string; search?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return apiFetch<{ records: any[] }>(`/payroll/records?${query}`);
+  },
+
+  async getEmployeePayslips(employeeId: string) {
+    return apiFetch<{ records: any[] }>(`/payroll/employee/${employeeId}`);
+  },
+
+  async generatePayroll(month: string, year: number) {
+    return apiFetch<{ success: boolean; message: string }>('/payroll/generate', {
+      method: 'POST',
+      body: JSON.stringify({ month, year }),
+    });
+  },
+
+  async updatePayrollStatus(id: string, data: { status: string; paymentMethod?: string; paymentDate?: string }) {
+    return apiFetch<{ success: boolean; record: any }>(`/payroll/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getPayslip(id: string) {
+    return apiFetch<{ payslip: any }>(`/payroll/${id}/payslip`);
+  },
+
+  // Faculties & Staffs Details
+  async getStaffList(params?: { department?: string; role?: string; status?: string; search?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return apiFetch<{ staff: any[] }>(`/staff?${query}`);
+  },
+
+  async getStaffStats() {
+    return apiFetch<{
+      totalCount: number;
+      totalFaculty: number;
+      totalSupportStaff: number;
+      departmentCounts: Record<string, number>;
+      roleCounts: Record<string, number>;
+      activeCount: number;
+      onLeaveCount: number;
+    }>('/staff/stats');
+  },
+
+  async getStaffMember(id: string) {
+    return apiFetch<{ staff: any; payrolls: any[] }>(`/staff/${id}`);
+  },
+
+  async createStaffMember(data: any) {
+    return apiFetch<{ success: boolean; staff: any }>('/staff', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateStaffMember(id: string, data: any) {
+    return apiFetch<{ success: boolean; staff: any }>(`/staff/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteStaffMember(id: string) {
+    return apiFetch<{ success: boolean; message: string }>(`/staff/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Assessments Portal
+  async getAssessments(params?: { grade?: string; section?: string; subject?: string; facultyId?: string; term?: string; search?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return apiFetch<{ assessments: any[] }>(`/assessments?${query}`);
+  },
+
+  async getAssessmentDetails(id: string) {
+    return apiFetch<{ assessment: any; marks: any[]; analytics: any; submissions: any[] }>(`/assessments/${id}`);
+  },
+
+  async createAssessment(data: any) {
+    return apiFetch<{ success: boolean; assessment: any; enrolledCount: number }>('/assessments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateAssessmentMarks(id: string, marksList: Array<{ studentId: string; marksObtained: number | null; feedback?: string; questionMarks?: Record<string, number> }>) {
+    return apiFetch<{ success: boolean; message: string }>(`/assessments/${id}/marks`, {
+      method: 'POST',
+      body: JSON.stringify({ marksList }),
+    });
+  },
+
+  async updateAssessmentDeadline(id: string, dueAt: string) {
+    return apiFetch<{ success: boolean; dueAt: string }>(`/assessments/${id}/deadline`, { method: 'PATCH', body: JSON.stringify({ dueAt }) });
+  },
+
+  async deleteAssessment(id: string) {
+    return apiFetch<{ success: boolean; message: string }>(`/assessments/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async submitAssessment(id: string, data: { file?: { name: string; type: string; data: string }; answers?: Record<string, string>; notes?: string }) {
+    return apiFetch<{ success: boolean; submission: any }>(`/assessments/${id}/submit`, { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  async startAssessment(id: string) {
+    return apiFetch<{ startedAt: string; endsAt: string }>(`/assessments/${id}/start`, { method: 'POST', body: JSON.stringify({}) });
+  },
+
+  async getAssessmentSubmissionFile(id: string, submissionId: string) {
+    return apiFetch<{ file: { name: string; type: string; data: string } }>(`/assessments/${id}/submissions/${submissionId}/file`);
+  },
+
+  async getStudentAssessments(studentId: string) {
+    return apiFetch<{
+      studentId: string;
+      totalAssessments: number;
+      gradedAssessments: number;
+      assessments: any[];
+      subjectBreakdown: any[];
+    }>(`/assessments/student/${studentId}`);
+  },
+
+  // Transportation Management
+  async getTransportOverview() {
+    return apiFetch<{
+      totalRoutes: number;
+      activeRoutes: number;
+      totalVehicles: number;
+      gpsActiveVehicles: number;
+      totalFleetCapacity: number;
+      totalStudentsAllocated: number;
+      utilizationRate: number;
+    }>('/transport/overview');
+  },
+
+  async getTransportRoutes(params?: { status?: string; search?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return apiFetch<{ routes: any[] }>(`/transport/routes?${query}`);
+  },
+
+  async getRouteDetails(id: string) {
+    return apiFetch<{ route: any }>(`/transport/routes/${id}`);
+  },
+
+  async createTransportRoute(data: any) {
+    return apiFetch<{ success: boolean; route: any }>('/transport/routes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateTransportRoute(id: string, data: any) {
+    return apiFetch<{ success: boolean; route: any }>(`/transport/routes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteTransportRoute(id: string) {
+    return apiFetch<{ success: boolean; message: string }>(`/transport/routes/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async getTransportVehicles() {
+    return apiFetch<{ vehicles: any[] }>('/transport/vehicles');
+  },
+
+  async getTransportAllocations(params?: { routeId?: string; studentId?: string; search?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return apiFetch<{ allocations: any[] }>(`/transport/allocations?${query}`);
+  },
+
+  async allocateStudentTransport(data: any) {
+    return apiFetch<{ success: boolean; allocation: any }>('/transport/allocate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async removeTransportAllocation(id: string) {
+    return apiFetch<{ success: boolean; message: string }>(`/transport/allocations/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async simulateTransitProgress(routeId: string) {
+    return apiFetch<{ success: boolean; status: string; currentTransitStep: number }>(`/transport/routes/${routeId}/simulate-transit`, {
+      method: 'POST',
+    });
   },
 };

@@ -1,27 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { api, User } from '../../services/api';
+import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import {
-  GraduationCap, CheckSquare, BookOpen, Clock, Calendar, Megaphone,
-  CheckCircle2, ArrowRight, AlertCircle, Plus, Users, Award, Sparkles
+  GraduationCap, CheckSquare, BookOpen, Clock, ArrowRight, Plus, Users, Award, Activity
 } from 'lucide-react';
 
 export const TeacherDashboard: React.FC = () => {
   const { user } = useAuth();
-  const [teacherData, setTeacherData] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assessments, setAssessments] = useState<any[]>([]);
+  const [todayClasses, setTodayClasses] = useState<any[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [tchRes, clsRes] = await Promise.all([
-          api.getTeacher('tch_1'),
-          api.getClasses(),
+        const [classResult, assessmentResult, timetableResult] = await Promise.allSettled([
+          api.getClasses(), api.getAssessments(),
+          api.getTimetable({ teacherName: user?.fullName, day: new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' }) }),
         ]);
-        setTeacherData(tchRes);
-        setClasses(clsRes.classes || []);
+        if (classResult.status === 'fulfilled') setClasses(classResult.value.classes || []);
+        if (assessmentResult.status === 'fulfilled') setAssessments(assessmentResult.value.assessments || []);
+        if (timetableResult.status === 'fulfilled') setTodayClasses((timetableResult.value.slots || []).map((slot: any) => ({
+          period: slot.period_index, time: `${slot.start_time} - ${slot.end_time}`, grade: `${slot.grade}${slot.section}`, subject: slot.subject,
+          room: slot.room_number || 'Room not assigned', status: 'UPCOMING',
+        })));
       } catch (err) {
         console.error(err);
       } finally {
@@ -29,146 +33,105 @@ export const TeacherDashboard: React.FC = () => {
       }
     };
     load();
-  }, []);
+  }, [user?.id]);
 
-  const todayClasses = [
-    { period: 1, time: '08:30 - 09:15', grade: 'Grade 10A', subject: 'Calculus: Derivatives', room: 'Room 301', status: 'COMPLETED' },
-    { period: 3, time: '10:10 - 10:55', grade: 'Grade 11A', subject: 'Linear Transformations', room: 'Room 401', status: 'IN_PROGRESS' },
-    { period: 6, time: '13:40 - 14:25', grade: 'Grade 10B', subject: 'Quadratic Optimization', room: 'Room 302', status: 'UPCOMING' },
-    { period: 7, time: '14:30 - 15:15', grade: 'Grade 12A', subject: 'Multivariable Integration', room: 'Room 402', status: 'UPCOMING' },
+  const allottedClasses = user?.allottedClasses || [];
+  const taughtClassRows = classes.filter((item: any) => allottedClasses.length === 0 || allottedClasses.some((c: any) => c.grade === item.grade && c.section === item.section));
+  const studentsCount = taughtClassRows.reduce((sum: number, item: any) => sum + Number(item.total_students || 0), 0);
+  const pendingGrading = assessments.reduce((sum: number, item: any) => sum + Math.max(0, Number(item.totalStudents || 0) - Number(item.gradedCount || 0)), 0);
+  const gradedAssessments = assessments.filter((item: any) => Number(item.gradedCount) > 0);
+  const classAverage = gradedAssessments.length ? Math.round(gradedAssessments.reduce((sum: number, item: any) => sum + (Number(item.max_marks) ? Number(item.averageScore || 0) / Number(item.max_marks) * 100 : 0), 0) / gradedAssessments.length) : null;
+  const kpiCards = [
+    { label: "Today's Lectures", value: loading ? '—' : `${todayClasses.length} periods`, sub: 'Teaching schedule', icon: Clock, gradient: 'from-cyan-600 to-teal-600', glow: 'rgba(6, 182, 212, 0.15)' },
+    { label: 'Mentored Students', value: loading ? '—' : String(studentsCount), sub: `${taughtClassRows.length} allotted classes`, icon: Users, gradient: 'from-blue-600 to-indigo-600', glow: 'rgba(99, 102, 241, 0.15)' },
+    { label: 'Pending Grading', value: loading ? '—' : String(pendingGrading), sub: `${assessments.length} assessments`, icon: BookOpen, gradient: 'from-amber-500 to-orange-600', glow: 'rgba(245, 158, 11, 0.15)' },
+    { label: 'Class Avg Score', value: loading ? '—' : classAverage === null ? '—' : `${classAverage}%`, sub: `${gradedAssessments.length} graded assessments`, icon: Award, gradient: 'from-emerald-600 to-emerald-500', glow: 'rgba(16, 185, 129, 0.15)' },
   ];
 
   return (
-    <div className="space-y-8 animate-fadeIn">
+    <div className="space-y-6">
       {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-teal-600 mb-1">
-            <GraduationCap className="w-4 h-4" />
-            <span>Faculty Workspace & Class Operations</span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="badge badge-cyan"><GraduationCap className="w-3 h-3" /> Faculty Workspace</span>
+            <span className="badge badge-emerald"><Activity className="w-3 h-3" /> Live</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display tracking-tight">
             Good Morning, {user?.fullName || 'Mrs. Priya Nair'}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Senior Mathematics Faculty • Grade 10 Lead Mentor • 4 Classes Scheduled Today
-          </p>
+          <p className="text-sm text-slate-600 mt-1">Faculty workspace • {taughtClassRows.length} allotted classes • live assessment summary</p>
         </div>
-
         <div className="flex items-center gap-2">
-          <Link
-            to="/attendance"
-            className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs shadow-md flex items-center gap-2"
+          <Link to="/attendance"
+            className="px-4 py-2.5 rounded-xl text-white font-semibold text-xs flex items-center gap-2 transition-all hover:shadow-lg"
+            style={{ background: 'linear-gradient(135deg, #06b6d4, #0d9488)', boxShadow: '0 4px 15px rgba(6, 182, 212, 0.25)' }}
           >
-            <CheckSquare className="w-4 h-4" />
-            <span>Mark Daily Attendance</span>
+            <CheckSquare className="w-4 h-4" /> Mark Attendance
           </Link>
-          <Link
-            to="/homework"
-            className="px-4 py-2.5 rounded-xl bg-navy-800 hover:bg-navy-900 text-white font-semibold text-xs shadow-md flex items-center gap-2"
+          <Link to="/assessments"
+            className="px-4 py-2.5 rounded-xl text-white font-semibold text-xs flex items-center gap-2 transition-all hover:shadow-lg"
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)', boxShadow: '0 4px 15px rgba(124, 58, 237, 0.25)' }}
           >
-            <Plus className="w-4 h-4 text-teal-400" />
-            <span>Post Assignment</span>
+            <Plus className="w-4 h-4" /> Create Assessment
           </Link>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Today's Lectures</span>
-            <Clock className="w-5 h-5 text-teal-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">4 Periods</div>
-          <div className="text-[11px] text-teal-700 font-bold mt-1">Period 3 Active (Room 401)</div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Mentored Students</span>
-            <Users className="w-5 h-5 text-blue-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-blue-800 font-display">148</div>
-          <div className="text-[11px] text-slate-600 font-medium mt-1">Across 4 Sections</div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Pending Grading</span>
-            <BookOpen className="w-5 h-5 text-amber-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-amber-600 font-display">24 Subs</div>
-          <div className="text-[11px] text-amber-800 font-semibold mt-1">Problem Set 4.3 Calculus</div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Class Avg Score</span>
-            <Award className="w-5 h-5 text-teal-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">94.2%</div>
-          <div className="text-[11px] text-teal-700 font-bold mt-1">Grade 10A Mathematics</div>
-        </div>
-      </div>
-
-      {/* Today's Schedule & Quick Attendance Launcher */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Today's Lectures */}
-        <div className="lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 font-display">Today's Class Schedule</h3>
-              <p className="text-xs text-slate-500">Live period progression for Monday</p>
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {kpiCards.map((kpi, i) => (
+          <div key={kpi.label} className={`relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg animate-fadeInUp stagger-${i + 1}`}
+            style={{ boxShadow: `0 8px 28px rgba(15, 23, 42, 0.07), 0 0 40px ${kpi.glow}` }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">{kpi.label}</span>
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${kpi.gradient} flex items-center justify-center shadow-lg`}>
+                <kpi.icon className="w-4 h-4 text-white" />
+              </div>
             </div>
-            <Link to="/timetable" className="text-xs font-bold text-teal-600 hover:underline">
-              Full Timetable
-            </Link>
+            <div className="text-2xl font-black text-slate-900 sm:text-3xl">{kpi.value}</div>
+            <div className="mt-1 text-[11px] text-slate-600">{kpi.sub}</div>
           </div>
+        ))}
+      </div>
 
-          <div className="space-y-3">
+      {/* Schedule & Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-8 space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div><h3 className="text-sm font-bold text-slate-900 font-display">Today's Schedule</h3><p className="text-xs text-slate-500">Your timetable for today</p></div>
+            <Link to="/timetable" className="text-xs font-bold text-iris-400 hover:text-iris-300 transition-colors">Full Timetable</Link>
+          </div>
+          <div className="space-y-2.5">
+            {todayClasses.length === 0 && !loading && <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm font-medium text-slate-500">No timetable periods are assigned to you today.</div>}
             {todayClasses.map((item, idx) => (
-              <div
-                key={idx}
-                className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
-                  item.status === 'IN_PROGRESS'
-                    ? 'bg-teal-50/80 border-teal-300 ring-2 ring-teal-400/20'
-                    : 'bg-slate-50 border-slate-200'
-                }`}
-              >
+              <div key={idx} className={`p-4 rounded-xl flex items-center justify-between gap-3 transition-all ${
+                item.status === 'IN_PROGRESS' ? 'animate-borderGlow' : ''
+              }`} style={{
+                background: item.status === 'IN_PROGRESS' ? 'rgba(6, 182, 212, 0.08)' : '#f8fafc',
+                border: `1px solid ${item.status === 'IN_PROGRESS' ? 'rgba(6, 182, 212, 0.3)' : '#e2e8f0'}`,
+              }}>
                 <div className="flex items-center gap-3.5">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ${
-                    item.status === 'IN_PROGRESS' ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
+                    item.status === 'IN_PROGRESS' ? 'bg-gradient-to-br from-cyan-600 to-teal-600 text-white shadow-lg shadow-cyan-600/20' : 'text-slate-400'
+                  }`} style={item.status !== 'IN_PROGRESS' ? { background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569' } : {}}>
                     P{item.period}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-slate-900">{item.grade}</span>
-                      <span className="text-xs font-semibold text-slate-600">• {item.subject}</span>
+                      <span className="text-xs text-slate-600">• {item.subject}</span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {item.time} • {item.room}
-                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">{item.time} • {item.room}</div>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-2">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                    item.status === 'IN_PROGRESS'
-                      ? 'bg-teal-200 text-teal-900 animate-pulse'
-                      : item.status === 'COMPLETED'
-                      ? 'bg-slate-200 text-slate-700'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {item.status.replace('_', ' ')}
-                  </span>
-                  <Link
-                    to="/attendance"
-                    className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-600"
-                    title="Open Roster"
-                  >
-                    <ArrowRight className="w-4 h-4 text-teal-600" />
+                  <span className={`badge text-[9px] ${
+                    item.status === 'IN_PROGRESS' ? 'badge-cyan' : item.status === 'COMPLETED' ? 'badge-emerald' : 'badge-amber'
+                  }`}>{item.status.replace('_', ' ')}</span>
+                  <Link to="/attendance" className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900">
+                    <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
               </div>
@@ -176,54 +139,26 @@ export const TeacherDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Leave & Faculty Actions */}
-        <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
-          <h3 className="text-base font-bold text-slate-900 font-display">Faculty Quick Actions</h3>
-          
-          <div className="space-y-2.5">
-            <Link
-              to="/attendance"
-              className="p-3.5 rounded-2xl bg-teal-50 border border-teal-200 hover:bg-teal-100/70 transition-colors flex items-center justify-between text-xs font-semibold text-teal-900"
-            >
-              <div className="flex items-center gap-2.5">
-                <CheckSquare className="w-4 h-4 text-teal-600" />
-                <span>Bulk Mark Attendance</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-
-            <Link
-              to="/homework"
-              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between text-xs font-semibold text-slate-800"
-            >
-              <div className="flex items-center gap-2.5">
-                <BookOpen className="w-4 h-4 text-navy-800" />
-                <span>Assignment Repository</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-
-            <Link
-              to="/leave"
-              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between text-xs font-semibold text-slate-800"
-            >
-              <div className="flex items-center gap-2.5">
-                <Clock className="w-4 h-4 text-amber-600" />
-                <span>Apply for Faculty Leave</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-
-            <Link
-              to="/spotlight"
-              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between text-xs font-semibold text-slate-800"
-            >
-              <div className="flex items-center gap-2.5">
-                <Award className="w-4 h-4 text-purple-600" />
-                <span>Nominate Student for Spotlight</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+        {/* Quick Actions */}
+        <div className="lg:col-span-4 space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-900 font-display">Quick Actions</h3>
+          <div className="space-y-2">
+            {[
+              { to: '/attendance', icon: CheckSquare, label: 'Bulk Mark Attendance', color: 'text-cyan-400' },
+              { to: '/assessments', icon: BookOpen, label: 'Assessment & Quiz Studio', color: 'text-indigo-600' },
+              { to: '/leave', icon: Clock, label: 'Apply for Leave', color: 'text-amber-400' },
+              { to: '/spotlight', icon: Award, label: 'Nominate for Spotlight', color: 'text-emerald-400' },
+            ].map((action) => (
+              <Link key={action.to} to={action.to}
+                className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs font-semibold text-slate-700 transition-all hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-800"
+              >
+                <div className="flex items-center gap-2.5">
+                  <action.icon className={`w-4 h-4 ${action.color}`} />
+                  <span>{action.label}</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
+              </Link>
+            ))}
           </div>
         </div>
       </div>

@@ -2,21 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
-import { BrandLogo } from '../../components/brand/BrandLogo';
 import {
   Shield, Eye, EyeOff, Lock, User as UserIcon, Mail, Phone, ArrowRight,
   Sparkles, CheckCircle, AlertCircle, Clock, X, HelpCircle, Building2,
   GraduationCap, Users, HeartHandshake, ChevronRight, Server, Key,
-  BookOpen, PhoneCall, MessageSquare, Info
+  BookOpen, PhoneCall, MessageSquare, Info, Zap
 } from 'lucide-react';
 
 export type PortalRole = 'admin' | 'teacher' | 'student' | 'parent';
-
-interface OtherRoleLink {
-  key: PortalRole;
-  label: string;
-  path: string;
-}
 
 interface RoleConfig {
   roleKey: 'SUPER_ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
@@ -26,7 +19,6 @@ interface RoleConfig {
   portalSubtitle: string;
   heroHeadline: string;
   heroSubline: string;
-  heroImage: string;
   identifierLabel: string;
   identifierHint: string;
   identifierPlaceholder: string;
@@ -36,16 +28,12 @@ interface RoleConfig {
   defaultPassword: string;
   roleName: string;
   floatingFeature: string;
-  tintGlow: string;
-  themeTagColor: string;
-  submitButtonClass: string;
-  inputFocusRing: string;
-  accentLinkColor: string;
-  heroBadgeStyle: string;
-  heroIconStyle: string;
-  iconBg: string;
+  gradient: string;
+  glowColor: string;
+  badgeClass: string;
+  iconGradient: string;
   roleIcon: React.ReactNode;
-  otherRoles: OtherRoleLink[];
+  otherRoles: { key: PortalRole; label: string; path: string }[];
 }
 
 const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
@@ -57,25 +45,20 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     portalSubtitle: 'Principal, Vice-Principal & Leadership Console',
     heroHeadline: 'Command school operations with precision & foresight.',
     heroSubline: 'Unified institutional governance, staff records, real-time analytics, and automated administrative control.',
-    heroImage: '/assets/heroes/admin_hero.jpg',
     identifierLabel: 'Administrator Email or Username',
     identifierHint: 'Official school leadership account (e.g. admin@campusos.edu)',
-    identifierPlaceholder: 'e.g. admin@campusos.edu or admin.lead',
+    identifierPlaceholder: 'e.g. admin@campusos.edu',
     identifierType: 'text',
     buttonLabel: 'Sign In to Admin Portal',
     defaultIdentifier: 'admin@campusos.edu',
     defaultPassword: 'Admin@2026',
     roleName: 'Admin',
-    floatingFeature: 'Institutional Oversight • Multi-Tenant RBAC Active',
-    tintGlow: 'from-slate-950 via-slate-950/75 to-navy-950/50',
-    themeTagColor: 'text-indigo-800 bg-indigo-50 border-indigo-200',
-    submitButtonClass: 'bg-slate-900 hover:bg-slate-950 text-white shadow-md shadow-slate-900/10',
-    inputFocusRing: 'focus:border-slate-800 focus:ring-slate-100',
-    accentLinkColor: 'text-indigo-700 hover:text-indigo-900',
-    heroBadgeStyle: 'bg-indigo-500/25 text-indigo-100 border-indigo-300/30',
-    heroIconStyle: 'bg-indigo-500/30 text-indigo-300 border-indigo-400/40',
-    iconBg: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
-    roleIcon: <Building2 className="w-5 h-5 text-indigo-700" />,
+    floatingFeature: 'Institutional Oversight • Multi-Tenant RBAC',
+    gradient: 'from-iris-600 to-purple-700',
+    glowColor: 'rgba(124, 58, 237, 0.2)',
+    badgeClass: 'badge-iris',
+    iconGradient: 'from-iris-600 to-iris-500',
+    roleIcon: <Building2 className="w-5 h-5 text-white" />,
     otherRoles: [
       { key: 'teacher', label: 'Teacher Login', path: '/teacher/login' },
       { key: 'student', label: 'Student Login', path: '/student/login' },
@@ -87,10 +70,9 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     portalPath: '/teacher/login',
     badgeLabel: 'FACULTY & TEACHING STAFF',
     portalTitle: 'Teacher Sign In',
-    portalSubtitle: 'Classroom attendance, homework grading & student evaluation',
+    portalSubtitle: 'Classroom attendance, grading & evaluation',
     heroHeadline: 'Inspire potential, measure mastery, shape futures.',
     heroSubline: 'Intuitive classroom attendance, rapid homework reviews, and continuous student diagnostic reports.',
-    heroImage: '/assets/heroes/teacher_hero.jpg',
     identifierLabel: 'Teacher ID or School Email',
     identifierHint: 'Use your school-issued email or employee code',
     identifierPlaceholder: 'e.g. priya.nair@campusos.edu',
@@ -99,16 +81,12 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     defaultIdentifier: 'priya.nair@campusos.edu',
     defaultPassword: 'Teacher@2026',
     roleName: 'Teacher',
-    floatingFeature: 'Smart Classroom Sync • Live Timetable & Gradebook',
-    tintGlow: 'from-slate-950 via-slate-950/75 to-teal-950/50',
-    themeTagColor: 'text-teal-800 bg-teal-50 border-teal-200',
-    submitButtonClass: 'bg-teal-700 hover:bg-teal-800 text-white shadow-md shadow-teal-700/15',
-    inputFocusRing: 'focus:border-teal-600 focus:ring-teal-100',
-    accentLinkColor: 'text-teal-700 hover:text-teal-900',
-    heroBadgeStyle: 'bg-teal-500/25 text-teal-100 border-teal-300/30',
-    heroIconStyle: 'bg-teal-500/30 text-teal-300 border-teal-400/40',
-    iconBg: 'bg-teal-50 text-teal-700 border border-teal-200',
-    roleIcon: <BookOpen className="w-5 h-5 text-teal-700" />,
+    floatingFeature: 'Smart Classroom Sync • Live Gradebook',
+    gradient: 'from-cyan-600 to-teal-600',
+    glowColor: 'rgba(6, 182, 212, 0.2)',
+    badgeClass: 'badge-cyan',
+    iconGradient: 'from-cyan-600 to-teal-500',
+    roleIcon: <BookOpen className="w-5 h-5 text-white" />,
     otherRoles: [
       { key: 'student', label: 'Student Login', path: '/student/login' },
       { key: 'parent', label: 'Parent Login', path: '/parent/login' },
@@ -120,28 +98,23 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     portalPath: '/student/login',
     badgeLabel: 'STUDENT ACADEMIC PORTAL',
     portalTitle: 'Student Sign In',
-    portalSubtitle: 'Live study schedule, homework submissions & gradebook',
+    portalSubtitle: 'Study schedule, homework & gradebook',
     heroHeadline: 'Your modern campus companion for discovery & growth.',
-    heroSubline: 'Real-time timetable, assignment submissions, digital gradebook, and digital library resources.',
-    heroImage: '/assets/heroes/student_hero.jpg',
-    identifierLabel: 'Student Roll No. or Student Email',
+    heroSubline: 'Real-time timetable, assignment submissions, digital gradebook, and library resources.',
+    identifierLabel: 'Student Roll No. or Email',
     identifierHint: 'Find your Roll Number on your school identity card',
-    identifierPlaceholder: 'e.g. STU-2026-8841 or arav.patel@campusos.edu',
+    identifierPlaceholder: 'e.g. arav.patel@campusos.edu',
     identifierType: 'text',
     buttonLabel: 'Sign In to Student Portal',
     defaultIdentifier: 'arav.patel@campusos.edu',
     defaultPassword: 'Student@2026',
     roleName: 'Student',
-    floatingFeature: 'Automated GPA • Interactive Schedule & Assignments',
-    tintGlow: 'from-slate-950 via-slate-950/75 to-blue-950/50',
-    themeTagColor: 'text-blue-800 bg-blue-50 border-blue-200',
-    submitButtonClass: 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/15',
-    inputFocusRing: 'focus:border-blue-600 focus:ring-blue-100',
-    accentLinkColor: 'text-blue-700 hover:text-blue-900',
-    heroBadgeStyle: 'bg-blue-500/25 text-blue-100 border-blue-300/30',
-    heroIconStyle: 'bg-blue-500/30 text-blue-300 border-blue-400/40',
-    iconBg: 'bg-blue-50 text-blue-700 border border-blue-200',
-    roleIcon: <GraduationCap className="w-5 h-5 text-blue-700" />,
+    floatingFeature: 'Automated GPA • Interactive Assignments',
+    gradient: 'from-blue-600 to-indigo-600',
+    glowColor: 'rgba(99, 102, 241, 0.2)',
+    badgeClass: 'badge-iris',
+    iconGradient: 'from-blue-600 to-indigo-600',
+    roleIcon: <GraduationCap className="w-5 h-5 text-white" />,
     otherRoles: [
       { key: 'parent', label: 'Parent Login', path: '/parent/login' },
       { key: 'teacher', label: 'Teacher Login', path: '/teacher/login' },
@@ -153,28 +126,23 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     portalPath: '/parent/login',
     badgeLabel: 'PARENT & FAMILY PORTAL',
     portalTitle: 'Parent Sign In',
-    portalSubtitle: 'Track child attendance, academic progress & fee receipts',
-    heroHeadline: 'Partner in your child’s educational journey & milestones.',
-    heroSubline: 'Comprehensive attendance tracking, marks insights, teacher dialogues, and school fee receipts.',
-    heroImage: '/assets/heroes/parent_hero.jpg',
-    identifierLabel: 'Parent Mobile Number or Registered Email',
-    identifierHint: 'Enter the 10-digit mobile number registered with the school',
-    identifierPlaceholder: 'e.g. 98765 43210 or rajesh.patel@gmail.com',
+    portalSubtitle: 'Track attendance, progress & fees',
+    heroHeadline: "Partner in your child's educational journey.",
+    heroSubline: 'Comprehensive attendance tracking, marks insights, teacher dialogues, and fee receipts.',
+    identifierLabel: 'Parent Mobile or Email',
+    identifierHint: 'Enter the mobile number registered with the school',
+    identifierPlaceholder: 'e.g. rajesh.patel@gmail.com',
     identifierType: 'text',
     buttonLabel: 'Sign In to Parent Portal',
     defaultIdentifier: 'rajesh.patel@gmail.com',
     defaultPassword: 'Parent@2026',
     roleName: 'Parent',
-    floatingFeature: 'Multi-Child Linkage • Real-time Attendance & Fee Alerts',
-    tintGlow: 'from-slate-950 via-slate-950/75 to-amber-950/50',
-    themeTagColor: 'text-amber-800 bg-amber-50 border-amber-200',
-    submitButtonClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-600/15',
-    inputFocusRing: 'focus:border-amber-600 focus:ring-amber-100',
-    accentLinkColor: 'text-amber-700 hover:text-amber-900',
-    heroBadgeStyle: 'bg-amber-500/25 text-amber-100 border-amber-300/30',
-    heroIconStyle: 'bg-amber-500/30 text-amber-300 border-amber-400/40',
-    iconBg: 'bg-amber-50 text-amber-700 border border-amber-200',
-    roleIcon: <HeartHandshake className="w-5 h-5 text-amber-700" />,
+    floatingFeature: 'Multi-Child Linkage • Real-time Alerts',
+    gradient: 'from-amber-500 to-orange-600',
+    glowColor: 'rgba(245, 158, 11, 0.2)',
+    badgeClass: 'badge-amber',
+    iconGradient: 'from-amber-500 to-orange-600',
+    roleIcon: <HeartHandshake className="w-5 h-5 text-white" />,
     otherRoles: [
       { key: 'student', label: 'Student Login', path: '/student/login' },
       { key: 'teacher', label: 'Teacher Login', path: '/teacher/login' },
@@ -188,7 +156,6 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
   const location = useLocation();
   const { login } = useAuth();
 
-  // Determine current active role from route or prop
   const currentRole: PortalRole = (() => {
     if (location.pathname.includes('/teacher')) return 'teacher';
     if (location.pathname.includes('/student')) return 'student';
@@ -199,7 +166,6 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
 
   const config = ROLE_CONFIGS[currentRole];
 
-  // Form states
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -209,12 +175,10 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
   const [pendingState, setPendingState] = useState<{ requestId: string; fullName: string; role: string } | null>(null);
   const [roleMismatchAlert, setRoleMismatchAlert] = useState<string | null>(null);
 
-  // Modals
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showHelpdeskModal, setShowHelpdeskModal] = useState(false);
 
-  // Request Access form fields
   const [reqFullName, setReqFullName] = useState('');
   const [reqEmail, setReqEmail] = useState('');
   const [reqRole, setReqRole] = useState(config.roleKey);
@@ -225,11 +189,9 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
   const [reqLoading, setReqLoading] = useState(false);
   const [reqSuccess, setReqSuccess] = useState<{ requestId: string; message: string } | null>(null);
 
-  // Forgot password
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
 
-  // 3D Parallax effect on hero card
   const heroRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
@@ -241,9 +203,7 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
     setMousePos({ x, y });
   };
 
-  const handleMouseLeave = () => {
-    setMousePos({ x: 0, y: 0 });
-  };
+  const handleMouseLeave = () => setMousePos({ x: 0, y: 0 });
 
   const handlePrefillDemo = () => {
     setIdentifier(config.defaultIdentifier);
@@ -258,35 +218,19 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
     setPendingState(null);
     setRoleMismatchAlert(null);
 
-    if (!identifier.trim()) {
-      setErrorMessage(`Please enter your ${config.identifierLabel.toLowerCase()}.`);
-      return;
-    }
-    if (!password) {
-      setErrorMessage('Please enter your password.');
-      return;
-    }
+    if (!identifier.trim()) { setErrorMessage(`Please enter your ${config.identifierLabel.toLowerCase()}.`); return; }
+    if (!password) { setErrorMessage('Please enter your password.'); return; }
 
     setLoading(true);
-
     try {
       const res = await login(identifier, password, config.roleKey);
-      if (res.roleMismatchWarning) {
-        setRoleMismatchAlert(res.roleMismatchWarning);
-      }
-      // Redirect to dashboard
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 350);
+      if (res.roleMismatchWarning) setRoleMismatchAlert(res.roleMismatchWarning);
+      setTimeout(() => navigate('/dashboard'), 350);
     } catch (err: any) {
       if (err.data && err.data.status === 'PENDING') {
-        setPendingState({
-          requestId: err.data.requestId || 'REQ-88419',
-          fullName: err.data.user?.fullName || identifier,
-          role: err.data.user?.role || config.roleKey,
-        });
+        setPendingState({ requestId: err.data.requestId || 'REQ-88419', fullName: err.data.user?.fullName || identifier, role: err.data.user?.role || config.roleKey });
       } else {
-        setErrorMessage(err.message || 'Authentication failed. Please check your credentials or contact school desk.');
+        setErrorMessage(err.message || 'Authentication failed. Check credentials or contact school desk.');
       }
     } finally {
       setLoading(false);
@@ -296,23 +240,10 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reqFullName || !reqEmail) return;
-
     setReqLoading(true);
     try {
-      const res = await api.register({
-        fullName: reqFullName,
-        email: reqEmail,
-        password: reqPassword,
-        role: reqRole,
-        phone: reqPhone,
-        department: reqDepartment,
-        notes: reqNotes,
-      });
-
-      setReqSuccess({
-        requestId: res.requestId,
-        message: res.message,
-      });
+      const res = await api.register({ fullName: reqFullName, email: reqEmail, password: reqPassword, role: reqRole, phone: reqPhone, department: reqDepartment, notes: reqNotes });
+      setReqSuccess({ requestId: res.requestId, message: res.message });
     } catch (err: any) {
       alert(err.message || 'Failed to submit registration.');
     } finally {
@@ -331,194 +262,199 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
     }
   };
 
+  const modalStyle = {
+    background: 'rgba(15, 23, 42, 0.9)',
+    backdropFilter: 'blur(40px)',
+    border: '1px solid rgba(148, 163, 184, 0.1)',
+    boxShadow: '0 40px 80px rgba(0,0,0,0.5)',
+  };
+  const roleHeroImage = {
+    admin: '/assets/heroes/admin_hero.jpg',
+    teacher: '/assets/heroes/teacher_hero.jpg',
+    student: '/assets/heroes/student_hero.jpg',
+    parent: '/assets/heroes/parent_hero.jpg',
+  }[currentRole];
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-teal-500 selection:text-white">
-      {/* Background Decorative Dot Grid & Subtle Glows */}
-      <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none opacity-60" />
-      <div className="absolute -top-40 -left-40 w-[550px] h-[550px] bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-[550px] h-[550px] bg-teal-100/40 rounded-full blur-3xl pointer-events-none" />
-      
-      <div className="orbit-circle w-[900px] h-[900px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-30 pointer-events-none" />
-      <div className="orbit-circle w-[1200px] h-[1200px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20 pointer-events-none" />
+    <div className="campus-login min-h-screen bg-[#f8f9fc] text-slate-900 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-teal-500 selection:text-white">
+      {/* Aurora BG */}
+      <div className="cinema-bg" />
+      <div className="mesh-dots" />
 
-      {/* Top Header Bar */}
-      <header className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-3 flex items-center justify-between z-20">
-        <BrandLogo variant="light" size="md" badgeText="CBSE-AFF-9801" to="/" />
+      {/* Ambient orbs */}
+      <div className="absolute top-1/4 -left-40 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none opacity-30"
+        style={{ background: `radial-gradient(circle, ${config.glowColor}, transparent 60%)` }}
+      />
+      <div className="absolute bottom-1/4 -right-40 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none opacity-20"
+        style={{ background: 'radial-gradient(circle, rgba(6, 182, 212, 0.15), transparent 60%)' }}
+      />
 
-        {/* Quick Links: Portal Gateway, School Helpdesk Hotline & Real Campus View */}
+      {/* Top Header */}
+      <header className="campus-login-header w-full max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-3 flex items-center justify-between z-20">
+        <Link to="/" className="flex items-center gap-2.5 group">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-teal-600/20 group-hover:scale-105 transition-transform">
+            <Zap className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-white font-display tracking-tight">CampusOS</div>
+            <div className="text-[9px] font-bold text-teal-600 uppercase tracking-widest">CBSE-AFF-9801</div>
+          </div>
+        </Link>
+
         <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            to="/login"
-            className="flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 shadow-xs transition-all hover:shadow-sm"
+          <Link to="/login" className="flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-iris-300 px-3 py-2 rounded-xl transition-all"
+            style={{ background: 'rgba(124, 58, 237, 0.1)', border: '1px solid rgba(124, 58, 237, 0.15)' }}
           >
-            <span>← Portal Gateway</span>
+            <span>← Gateway</span>
           </Link>
-
-          <button
-            type="button"
-            onClick={() => setShowHelpdeskModal(true)}
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 shadow-xs transition-all hover:shadow-sm cursor-pointer"
+          <button type="button" onClick={() => setShowHelpdeskModal(true)}
+            className="flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white px-3 py-2 rounded-xl transition-all cursor-pointer"
+            style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(148, 163, 184, 0.08)' }}
           >
-            <PhoneCall className="w-3.5 h-3.5 text-teal-600" />
-            <span className="hidden sm:inline">School Helpdesk</span>
+            <PhoneCall className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Help Desk</span>
           </button>
-
-          <Link
-            to="/"
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 shadow-xs transition-all hover:shadow-sm"
-          >
-            <Building2 className="w-3.5 h-3.5 text-slate-600" />
-            <span className="hidden sm:inline">Campus View</span>
-          </Link>
         </div>
       </header>
 
-      {/* Main Center Access Card Container */}
+      {/* Main Login Card */}
       <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 my-auto z-10 py-4">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.08)] overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[560px]">
-          
-          {/* LEFT COLUMN: Cinematic Human Hero Visual */}
+        <div className="campus-login-shell rounded-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[560px]"
+          style={{
+            background: 'rgba(15, 23, 42, 0.5)',
+            border: '1px solid rgba(148, 163, 184, 0.08)',
+            boxShadow: `0 40px 80px rgba(0,0,0,0.4), 0 0 80px ${config.glowColor}`,
+          }}
+        >
+          {/* LEFT: Hero Visual */}
           <div
             ref={heroRef}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            className="hidden lg:flex lg:col-span-5 relative flex-col justify-between p-8 overflow-hidden select-none parallax-container bg-slate-950"
+            className="campus-login-visual hidden lg:flex lg:col-span-5 relative flex-col justify-between p-8 overflow-hidden select-none parallax-container"
+            style={{ backgroundImage: `linear-gradient(180deg, rgba(17,43,62,.08) 0%, rgba(17,43,62,.12) 42%, rgba(246,249,248,.94) 100%), url('${roleHeroImage}')` }}
           >
-            {/* Background Role Image with subtle depth parallax */}
-            <div
-              className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out opacity-85"
+            {/* Ambient glow */}
+            <div className="absolute inset-0 pointer-events-none transition-transform duration-700 ease-out"
               style={{
-                backgroundImage: `url(${config.heroImage}), url('/real_school_academic_wing.jpg')`,
-                transform: `scale(1.06) translate(${mousePos.x * 10}px, ${mousePos.y * 10}px)`,
+                background: `radial-gradient(circle at ${50 + mousePos.x * 30}% ${50 + mousePos.y * 30}%, ${config.glowColor}, transparent 60%)`,
+                transform: `scale(1.2)`,
               }}
             />
 
-            {/* Cinematic Gradient Dark Vignette */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-slate-950/40 pointer-events-none" />
+            {/* Animated morph blob */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 animate-morphBlob opacity-20 pointer-events-none"
+              style={{ background: `linear-gradient(135deg, ${config.glowColor}, rgba(6, 182, 212, 0.15))` }}
+            />
 
-            {/* Top Security & Role Badge */}
+            {/* Top badges */}
             <div className="relative z-10 flex items-center justify-between">
-              <span className={`text-[11px] uppercase tracking-widest font-extrabold px-3 py-1.5 rounded-full backdrop-blur-md border shadow-sm ${config.heroBadgeStyle}`}>
-                {config.badgeLabel}
-              </span>
-
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-full border border-emerald-500/40 shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <span className={`${config.badgeClass} badge text-[10px]`}>{config.badgeLabel}</span>
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold badge badge-emerald">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span>256-Bit SSL</span>
               </div>
             </div>
 
-            {/* Bottom Institutional Quote */}
+            {/* Bottom content */}
             <div className="relative z-10 mt-auto space-y-3">
-              <div className="bg-slate-950/85 backdrop-blur-xl p-5 rounded-2xl border border-white/15 shadow-2xl text-white">
-                <h2 className="text-xl font-extrabold !text-white leading-snug font-display tracking-tight drop-shadow-md mb-1.5">
+              <div className="rounded-xl p-5" style={{ background: 'rgba(2, 6, 23, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(148, 163, 184, 0.08)' }}>
+                <h2 className="text-xl font-bold text-white leading-snug font-display tracking-tight mb-2">
                   {config.heroHeadline}
                 </h2>
-                <p className="text-xs !text-slate-300 leading-relaxed font-normal">
-                  {config.heroSubline}
-                </p>
+                <p className="text-xs text-slate-400 leading-relaxed">{config.heroSubline}</p>
               </div>
 
-              {/* Floating Status Card */}
-              <div className="bg-navy-950/90 backdrop-blur-xl rounded-xl p-3.5 border border-white/20 shadow-xl flex items-center justify-between gap-3 text-white">
+              <div className="rounded-xl p-3.5 flex items-center justify-between gap-3"
+                style={{ background: 'rgba(2, 6, 23, 0.6)', backdropFilter: 'blur(16px)', border: '1px solid rgba(148, 163, 184, 0.06)' }}
+              >
                 <div className="flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-lg border flex items-center justify-center ${config.heroIconStyle}`}>
-                    <Sparkles className="w-4 h-4" />
+                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${config.iconGradient} flex items-center justify-center shadow-lg`}>
+                    <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-white tracking-wide">CampusOS Portal</div>
-                    <div className="text-[10px] text-slate-300">{config.floatingFeature}</div>
+                    <div className="text-xs font-bold text-white">CampusOS Portal</div>
+                    <div className="text-[10px] text-slate-500">{config.floatingFeature}</div>
                   </div>
                 </div>
-
                 <div className="text-right">
-                  <div className="text-[9px] uppercase font-bold text-teal-300">Server Status</div>
-                  <div className="text-[11px] font-mono text-emerald-400 font-bold flex items-center gap-1 justify-end">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                    Online
+                  <div className="text-[9px] uppercase font-bold text-cyan-400">Status</div>
+                  <div className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1 justify-end">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Online
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Clean, Focused Sign-In Form */}
-          <div className="lg:col-span-7 bg-white text-slate-900 p-7 sm:p-10 flex flex-col justify-between">
+          {/* RIGHT: Sign-In Form */}
+          <div className="campus-login-form lg:col-span-7 p-7 sm:p-10 flex flex-col justify-between relative">
+            {/* Subtle top glow */}
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-iris-500/20 to-transparent" />
+
             <div>
-              {/* Institutional Role Header */}
-              <div className="mb-6 pb-4 border-b border-slate-100 flex items-center justify-between gap-3">
+              {/* Role Header */}
+              <div className="mb-6 pb-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.06)' }}>
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-2xs flex-shrink-0 ${config.iconBg}`}>
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${config.iconGradient} flex items-center justify-center shadow-lg flex-shrink-0`}>
                     {config.roleIcon}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h1 className="text-xl sm:text-2xl font-black text-slate-900 font-display tracking-tight">
-                        {config.portalTitle}
-                      </h1>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                      {config.portalSubtitle}
-                    </p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-white font-display tracking-tight">{config.portalTitle}</h1>
+                    <p className="text-xs text-slate-500 mt-0.5">{config.portalSubtitle}</p>
                   </div>
                 </div>
-
-                {/* 1-Click Demo Fill Button */}
-                <button
-                  type="button"
-                  onClick={handlePrefillDemo}
-                  className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 transition-all cursor-pointer"
-                  title="Prefill test demo account"
+                <button type="button" onClick={handlePrefillDemo}
+                  className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-teal-600 hover:text-iris-300"
+                  style={{ background: 'rgba(124, 58, 237, 0.1)', border: '1px solid rgba(124, 58, 237, 0.15)' }}
+                  title="Prefill demo credentials"
                 >
-                  <Sparkles className="w-3 h-3 text-teal-600" />
-                  <span>Demo Fill</span>
+                  <Sparkles className="w-3 h-3" /> Demo
                 </button>
               </div>
 
-              {/* Error / Alert States */}
+              {/* Error / Alerts */}
               {errorMessage && (
-                <div className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">Sign In Error: </span>
-                    {errorMessage}
-                  </div>
+                <div className="mb-4 p-3.5 rounded-xl text-xs flex items-start gap-2.5"
+                  style={{ background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.15)', color: '#fb7185' }}
+                >
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div><span className="font-bold">Error: </span>{errorMessage}</div>
                 </div>
               )}
 
               {roleMismatchAlert && (
-                <div className="mb-4 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="mb-4 p-3.5 rounded-xl text-xs flex items-start gap-2.5"
+                  style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.15)', color: '#a78bfa' }}
+                >
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <div>{roleMismatchAlert}</div>
                 </div>
               )}
 
-              {/* Explicit Approval Pending State Card */}
               {pendingState && (
-                <div className="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-amber-800">
-                    <Clock className="w-4 h-4 text-amber-600 animate-spin" />
-                    <span>Account Pending Administrator Verification</span>
-                  </div>
-                  <p className="text-amber-800 leading-relaxed">
-                    Your registration for <strong>{pendingState.fullName}</strong> as <strong>{pendingState.role}</strong> has been received and is in the institutional approval queue.
+                <div className="mb-5 p-4 rounded-xl text-xs space-y-2"
+                  style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}
+                >
+                  <div className="flex items-center gap-2 font-bold"><Clock className="w-4 h-4 animate-spin" /> Pending Verification</div>
+                  <p className="text-amber-300/80">
+                    Registration for <strong>{pendingState.fullName}</strong> as <strong>{pendingState.role}</strong> is in queue.
                   </p>
-                  <div className="flex items-center justify-between pt-2 border-t border-amber-200 font-mono text-[11px] text-amber-900">
-                    <span>Reference: <strong>{pendingState.requestId}</strong></span>
-                    <span className="px-2 py-0.5 rounded bg-amber-200 font-bold">STATUS: PENDING</span>
+                  <div className="flex items-center justify-between pt-2 font-mono text-[11px] text-amber-400/60" style={{ borderTop: '1px solid rgba(245, 158, 11, 0.1)' }}>
+                    <span>Ref: <strong>{pendingState.requestId}</strong></span>
+                    <span className="badge badge-amber text-[9px]">PENDING</span>
                   </div>
                 </div>
               )}
 
-              {/* Clean Single-Action Form */}
+              {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Identifier field */}
                 <div>
-                  <label htmlFor="identifier-input" className="block text-xs font-bold text-slate-800 mb-1.5">
-                    {config.identifierLabel} <span className="text-red-500">*</span>
+                  <label htmlFor="identifier-input" className="block text-xs font-bold text-slate-300 mb-1.5">
+                    {config.identifierLabel} <span className="text-rose-400">*</span>
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                       {currentRole === 'parent' ? <Phone className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
                     </div>
                     <input
@@ -528,31 +464,28 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
                       placeholder={config.identifierPlaceholder}
-                      className="w-full pl-10 pr-4 py-3 text-sm rounded-xl bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-teal-600 focus:ring-3 focus:ring-teal-100 text-slate-900 placeholder:text-slate-400 font-medium transition-all shadow-2xs outline-none"
+                      className="input-dark w-full pl-10 pr-4"
                     />
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-1.5">
-                    <Info className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                    <Info className="w-3 h-3 flex-shrink-0" />
                     <span>{config.identifierHint}</span>
                   </div>
                 </div>
 
-                {/* Password field with show/hide toggle */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label htmlFor="password-input" className="block text-xs font-bold text-slate-800">
-                      Password <span className="text-red-500">*</span>
+                    <label htmlFor="password-input" className="block text-xs font-bold text-slate-300">
+                      Password <span className="text-rose-400">*</span>
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowForgotModal(true)}
-                      className={`text-xs font-bold ${config.accentLinkColor} transition-colors cursor-pointer hover:underline`}
+                    <button type="button" onClick={() => setShowForgotModal(true)}
+                      className="text-xs font-bold text-teal-600 hover:text-iris-300 transition-colors cursor-pointer"
                     >
                       Forgot password?
                     </button>
                   </div>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                       <Lock className="w-4 h-4" />
                     </div>
                     <input
@@ -562,84 +495,57 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full pl-10 pr-10 py-3 text-sm rounded-xl bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-teal-600 focus:ring-3 focus:ring-teal-100 text-slate-900 placeholder:text-slate-400 font-medium transition-all shadow-2xs outline-none"
+                      className="input-dark w-full pl-10 pr-10"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-700 cursor-pointer"
-                      title={showPassword ? 'Hide password' : 'Show password'}
+                    <button type="button" onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
 
-                {/* Remember Me & Encrypted Session Notice */}
                 <div className="flex items-center justify-between pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 font-medium">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-400 font-medium">
+                    <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)}
+                      className="rounded border-slate-600 bg-slate-800 text-iris-600 focus:ring-iris-500 focus:ring-offset-0"
                     />
-                    <span>Remember this device</span>
+                    <span>Remember device</span>
                   </label>
-
-                  <button
-                    type="button"
-                    onClick={handlePrefillDemo}
-                    className="sm:hidden text-xs font-bold text-teal-700 hover:underline cursor-pointer"
-                  >
-                    Use Demo Credentials
+                  <button type="button" onClick={handlePrefillDemo} className="sm:hidden text-xs font-bold text-teal-600 cursor-pointer">
+                    Use Demo
                   </button>
                 </div>
 
-                {/* Single Primary Action Button */}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`w-full py-3.5 px-4 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-2 active:scale-[0.99] ${config.submitButtonClass}`}
+                <button type="submit" disabled={loading}
+                  className={`w-full py-3.5 px-4 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer mt-2 active:scale-[0.99] bg-gradient-to-r ${config.gradient} hover:shadow-lg`}
+                  style={{ boxShadow: `0 8px 25px ${config.glowColor}` }}
                 >
                   {loading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Verifying Credentials...</span>
-                    </>
+                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Verifying...</>
                   ) : (
-                    <>
-                      <span>{config.buttonLabel}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
+                    <><span>{config.buttonLabel}</span><ArrowRight className="w-4 h-4" /></>
                   )}
                 </button>
               </form>
             </div>
 
-            {/* Bottom Institutional Footer & Request Access */}
-            <div className="pt-5 border-t border-slate-100 mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-500">
+            {/* Bottom links */}
+            <div className="pt-5 mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-500"
+              style={{ borderTop: '1px solid rgba(148, 163, 184, 0.06)' }}
+            >
               <div>
                 <span>New to school? </span>
-                <button
-                  type="button"
-                  onClick={() => setShowRequestModal(true)}
-                  className={`font-bold ${config.accentLinkColor} hover:underline cursor-pointer`}
-                >
-                  Request portal access
-                </button>
+                <button type="button" onClick={() => setShowRequestModal(true)}
+                  className="font-bold text-teal-600 hover:text-iris-300 cursor-pointer transition-colors"
+                >Request access</button>
               </div>
-
-              <div className="flex items-center gap-2 text-slate-400 text-[11px] font-medium">
-                <span>Oakridge CampusOS</span>
-                <span>•</span>
-                <button
-                  type="button"
-                  onClick={() => setShowHelpdeskModal(true)}
-                  className="text-slate-600 hover:text-teal-700 font-bold hover:underline cursor-pointer"
-                >
-                  Help Desk
-                </button>
+              <div className="flex items-center gap-3 text-[11px]">
+                {config.otherRoles.map((r) => (
+                  <Link key={r.key} to={r.path} className="text-slate-500 hover:text-white font-semibold transition-colors">
+                    {r.label}
+                  </Link>
+                ))}
               </div>
             </div>
           </div>
@@ -648,247 +554,109 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
 
       {/* Footer */}
       <footer className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 text-center text-xs text-slate-600 z-10 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          © 2026 CampusOS Intelligent School Management Platform. All institutional rights reserved.
-        </div>
+        <div>© 2026 CampusOS. All rights reserved.</div>
         <div className="flex items-center gap-4 font-semibold">
-          <button
-            type="button"
-            onClick={() => setShowHelpdeskModal(true)}
-            className="hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1"
+          <button type="button" onClick={() => setShowHelpdeskModal(true)}
+            className="hover:text-slate-300 transition-colors cursor-pointer flex items-center gap-1"
           >
-            <PhoneCall className="w-3.5 h-3.5 text-teal-600" />
-            <span>School Desk: +91 (080) 2845-7800</span>
+            <PhoneCall className="w-3.5 h-3.5 text-cyan-500" /> +91 (080) 2845-7800
           </button>
-          <span>•</span>
-          <Link to="/" className="hover:text-slate-900 transition-colors">Platform Overview</Link>
         </div>
       </footer>
 
-      {/* MODAL: School Helpdesk Assistance (Crucial for Tier 2/3 Users) */}
+      {/* Helpdesk Modal */}
       {showHelpdeskModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 relative animate-scaleIn">
-            <button
-              type="button"
-              onClick={() => setShowHelpdeskModal(false)}
-              className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
-            >
+        <div className="campus-login-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(2, 6, 23, 0.8)', backdropFilter: 'blur(8px)' }}
+          onClick={() => setShowHelpdeskModal(false)}
+        >
+          <div className="campus-login-modal rounded-2xl max-w-md w-full p-6 sm:p-7 relative animate-scaleIn" style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => setShowHelpdeskModal(false)} className="absolute top-5 right-5 p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/60 cursor-pointer transition-colors">
               <X className="w-5 h-5" />
             </button>
-
             <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center">
-                <PhoneCall className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 font-display">Oakridge Helpdesk Support</h3>
-                <p className="text-xs text-slate-500">Official Assistance for Parents, Teachers & Students</p>
-              </div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-600 to-teal-600 flex items-center justify-center shadow-lg"><PhoneCall className="w-5 h-5 text-white" /></div>
+              <div><h3 className="text-lg font-bold text-white font-display">Oakridge Help Desk</h3><p className="text-xs text-slate-500">Official Support</p></div>
             </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed mb-4">
-              If you are having trouble logging in or need to update your registered mobile number or roll number, our school office is ready to help.
-            </p>
-
+            <p className="text-xs text-slate-400 leading-relaxed mb-4">For login issues, mobile updates, or roll number assistance.</p>
             <div className="space-y-2.5 mb-5">
-              {/* Phone Line */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Phone className="w-4 h-4 text-teal-600" />
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-500 uppercase">School Office Hotline</div>
-                    <div className="text-sm font-bold text-slate-900">+91 (080) 2845-7800</div>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  8am - 4:30pm
-                </span>
+              <div className="p-3 rounded-xl flex items-center justify-between" style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(148, 163, 184, 0.06)' }}>
+                <div className="flex items-center gap-2.5"><Phone className="w-4 h-4 text-cyan-400" /><div><div className="text-[10px] font-bold text-slate-500 uppercase">School Line</div><div className="text-sm font-bold text-white">+91 (080) 2845-7800</div></div></div>
+                <span className="badge badge-emerald text-[9px]">8am-4:30pm</span>
               </div>
-
-              {/* WhatsApp Desk */}
-              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <MessageSquare className="w-4 h-4 text-emerald-600" />
-                  <div>
-                    <div className="text-[11px] font-bold text-emerald-800 uppercase">WhatsApp Support Desk</div>
-                    <div className="text-sm font-bold text-emerald-950">+91 98000 12345</div>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                  Fast Reply
-                </span>
+              <div className="p-3 rounded-xl flex items-center justify-between" style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                <div className="flex items-center gap-2.5"><MessageSquare className="w-4 h-4 text-emerald-400" /><div><div className="text-[10px] font-bold text-emerald-400 uppercase">WhatsApp</div><div className="text-sm font-bold text-white">+91 98000 12345</div></div></div>
+                <span className="badge badge-emerald text-[9px]">Fast Reply</span>
               </div>
-
-              {/* Email */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2.5">
-                <Mail className="w-4 h-4 text-slate-600" />
-                <div>
-                  <div className="text-[11px] font-bold text-slate-500 uppercase">IT & Academic Support</div>
-                  <div className="text-xs font-bold text-slate-900">support@campusos.edu</div>
-                </div>
+              <div className="p-3 rounded-xl flex items-center gap-2.5" style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(148, 163, 184, 0.06)' }}>
+                <Mail className="w-4 h-4 text-slate-400" /><div><div className="text-[10px] font-bold text-slate-500 uppercase">Email Support</div><div className="text-xs font-bold text-white">support@campusos.edu</div></div>
               </div>
             </div>
-
-            {/* Quick Tips */}
-            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1 mb-5">
-              <div className="font-bold flex items-center gap-1 text-blue-800">
-                <Info className="w-3.5 h-3.5" />
-                <span>Quick Tips:</span>
-              </div>
-              <ul className="list-disc list-inside text-[11px] text-blue-800 space-y-0.5 pl-1">
-                <li><strong>Parents:</strong> Use the mobile number registered during student admission.</li>
-                <li><strong>Students:</strong> Your Roll Number is on your physical ID badge.</li>
-                <li><strong>Teachers:</strong> Use your official school email ID.</li>
-              </ul>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowHelpdeskModal(false)}
-              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-950 text-white font-bold text-xs cursor-pointer"
-            >
-              Return to Login
-            </button>
+            <button type="button" onClick={() => setShowHelpdeskModal(false)}
+              className="w-full py-2.5 rounded-xl font-bold text-xs cursor-pointer text-white"
+              style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)', boxShadow: '0 4px 15px rgba(124, 58, 237, 0.2)' }}
+            >Return to Login</button>
           </div>
         </div>
       )}
 
-      {/* MODAL: Request Access (Creates PENDING user) */}
+      {/* Request Access Modal */}
       {showRequestModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white text-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-scaleIn">
-            <button
-              type="button"
-              onClick={() => {
-                setShowRequestModal(false);
-                setReqSuccess(null);
-              }}
-              className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div className="campus-login-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          style={{ background: 'rgba(2, 6, 23, 0.8)', backdropFilter: 'blur(8px)' }}
+          onClick={() => { setShowRequestModal(false); setReqSuccess(null); }}
+        >
+          <div className="campus-login-modal rounded-2xl max-w-lg w-full p-6 sm:p-8 relative animate-scaleIn" style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => { setShowRequestModal(false); setReqSuccess(null); }}
+              className="absolute top-5 right-5 p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/60 cursor-pointer transition-colors"
+            ><X className="w-5 h-5" /></button>
 
             {reqSuccess ? (
               <div className="text-center py-6 space-y-4">
-                <div className="w-14 h-14 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center mx-auto">
-                  <CheckCircle className="w-8 h-8" />
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-500 flex items-center justify-center mx-auto shadow-lg shadow-emerald-600/20">
+                  <CheckCircle className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 font-display">Access Request Submitted</h3>
-                <p className="text-sm text-slate-600 max-w-md mx-auto">
-                  Your registration ticket <strong>#{reqSuccess.requestId}</strong> has been logged in the School Management approvals queue.
-                </p>
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 text-left space-y-1 font-mono">
-                  <div>Applicant: {reqFullName}</div>
-                  <div>Assigned Role: {reqRole}</div>
-                  <div>Status: PENDING ADMIN REVIEW</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRequestModal(false);
-                    setReqSuccess(null);
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-navy-800 text-white font-semibold text-sm hover:bg-navy-900 cursor-pointer"
+                <h3 className="text-xl font-bold text-white font-display">Request Submitted</h3>
+                <p className="text-sm text-slate-400">Ticket <strong className="text-white">#{reqSuccess.requestId}</strong> logged for admin review.</p>
+                <div className="p-4 rounded-xl text-xs text-slate-400 text-left space-y-1 font-mono"
+                  style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(148, 163, 184, 0.06)' }}
                 >
-                  Return to Portal
-                </button>
+                  <div>Applicant: {reqFullName}</div><div>Role: {reqRole}</div><div>Status: PENDING</div>
+                </div>
+                <button type="button" onClick={() => { setShowRequestModal(false); setReqSuccess(null); }}
+                  className="w-full py-2.5 rounded-xl font-semibold text-sm text-white cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)' }}
+                >Return to Portal</button>
               </div>
             ) : (
               <div>
-                <div className="flex items-center gap-2 text-teal-600 text-xs font-bold uppercase tracking-wider mb-1">
-                  <Building2 className="w-4 h-4" />
-                  <span>Institutional Admission & Access</span>
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-1 text-teal-600">
+                  <Building2 className="w-4 h-4" /> Access Request
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 font-display mb-1">Request Portal Account</h3>
-                <p className="text-xs text-slate-500 mb-6">
-                  Submit your details for verification. School administration will review and activate your authorized role.
-                </p>
-
+                <h3 className="text-xl font-bold text-white font-display mb-1">Request Portal Account</h3>
+                <p className="text-xs text-slate-500 mb-6">Submit details for admin verification and role activation.</p>
                 <form onSubmit={handleRequestSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Full Legal Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={reqFullName}
-                      onChange={(e) => setReqFullName(e.target.value)}
-                      placeholder="e.g. Dr. Jennifer Croft or Rohan Mehta"
-                      className="glass-input w-full px-3.5 py-2.5 text-sm rounded-xl"
-                    />
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
+                    <input type="text" required value={reqFullName} onChange={(e) => setReqFullName(e.target.value)} placeholder="e.g. Dr. Jennifer Croft" className="input-dark" />
                   </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address *</label>
-                      <input
-                        type="email"
-                        required
-                        value={reqEmail}
-                        onChange={(e) => setReqEmail(e.target.value)}
-                        placeholder="name@campusos.edu"
-                        className="glass-input w-full px-3.5 py-2.5 text-sm rounded-xl"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Requested Role *</label>
-                      <select
-                        value={reqRole}
-                        onChange={(e) => setReqRole(e.target.value as any)}
-                        className="glass-input w-full px-3.5 py-2.5 text-sm rounded-xl bg-white"
-                      >
-                        <option value="TEACHER">Teacher / Faculty</option>
-                        <option value="STUDENT">Student</option>
-                        <option value="PARENT">Parent / Guardian</option>
-                        <option value="SCHOOL_ADMIN">School Admin</option>
+                    <div><label className="block text-xs font-semibold text-slate-300 mb-1">Email *</label><input type="email" required value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} placeholder="name@campusos.edu" className="input-dark" /></div>
+                    <div><label className="block text-xs font-semibold text-slate-300 mb-1">Role *</label>
+                      <select value={reqRole} onChange={(e) => setReqRole(e.target.value as any)} className="input-dark">
+                        <option value="TEACHER">Teacher</option><option value="STUDENT">Student</option><option value="PARENT">Parent</option><option value="SCHOOL_ADMIN">Admin</option>
                       </select>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
-                      <input
-                        type="tel"
-                        value={reqPhone}
-                        onChange={(e) => setReqPhone(e.target.value)}
-                        placeholder="+91 98000 00000"
-                        className="glass-input w-full px-3.5 py-2.5 text-sm rounded-xl"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Department / Grade</label>
-                      <input
-                        type="text"
-                        value={reqDepartment}
-                        onChange={(e) => setReqDepartment(e.target.value)}
-                        placeholder="e.g. Science / Grade 10"
-                        className="glass-input w-full px-3.5 py-2.5 text-sm rounded-xl"
-                      />
-                    </div>
+                    <div><label className="block text-xs font-semibold text-slate-300 mb-1">Phone</label><input type="tel" value={reqPhone} onChange={(e) => setReqPhone(e.target.value)} placeholder="+91 98000 00000" className="input-dark" /></div>
+                    <div><label className="block text-xs font-semibold text-slate-300 mb-1">Department</label><input type="text" value={reqDepartment} onChange={(e) => setReqDepartment(e.target.value)} placeholder="e.g. Science / Grade 10" className="input-dark" /></div>
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Initial Password *</label>
-                    <input
-                      type="password"
-                      required
-                      value={reqPassword}
-                      onChange={(e) => setReqPassword(e.target.value)}
-                      placeholder="Create secure password"
-                      className="glass-input w-full px-3.5 py-2.5 text-sm rounded-xl"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={reqLoading}
-                    className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm shadow-md transition-all mt-2 cursor-pointer"
-                  >
-                    {reqLoading ? 'Submitting Request...' : 'Submit Request for Approval'}
-                  </button>
+                  <div><label className="block text-xs font-semibold text-slate-300 mb-1">Password *</label><input type="password" required value={reqPassword} onChange={(e) => setReqPassword(e.target.value)} placeholder="Create password" className="input-dark" /></div>
+                  <button type="submit" disabled={reqLoading}
+                    className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-all cursor-pointer"
+                    style={{ background: 'linear-gradient(135deg, #059669, #10b981)', boxShadow: '0 4px 15px rgba(16,185,129,0.2)' }}
+                  >{reqLoading ? 'Submitting...' : 'Submit for Approval'}</button>
                 </form>
               </div>
             )}
@@ -896,68 +664,41 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
         </div>
       )}
 
-      {/* MODAL: Forgot Password */}
+      {/* Forgot Password Modal */}
       {showForgotModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-scaleIn">
-            <button
-              type="button"
-              onClick={() => {
-                setShowForgotModal(false);
-                setForgotSuccess(null);
-              }}
-              className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div className="campus-login-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(2, 6, 23, 0.8)', backdropFilter: 'blur(8px)' }}
+          onClick={() => { setShowForgotModal(false); setForgotSuccess(null); }}
+        >
+          <div className="campus-login-modal rounded-2xl max-w-md w-full p-6 sm:p-8 relative animate-scaleIn" style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => { setShowForgotModal(false); setForgotSuccess(null); }}
+              className="absolute top-5 right-5 p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/60 cursor-pointer transition-colors"
+            ><X className="w-5 h-5" /></button>
 
             {forgotSuccess ? (
               <div className="text-center py-4 space-y-3">
-                <div className="w-12 h-12 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center mx-auto">
-                  <CheckCircle className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 font-display">Recovery Instructions Sent</h3>
-                <p className="text-xs text-slate-700 leading-relaxed font-medium">{forgotSuccess}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForgotModal(false);
-                    setForgotSuccess(null);
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-navy-800 text-white font-bold text-xs mt-2 hover:bg-navy-900 cursor-pointer"
-                >
-                  Close
-                </button>
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-500 flex items-center justify-center mx-auto shadow-lg"><CheckCircle className="w-6 h-6 text-white" /></div>
+                <h3 className="text-lg font-bold text-white font-display">Recovery Sent</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">{forgotSuccess}</p>
+                <button type="button" onClick={() => { setShowForgotModal(false); setForgotSuccess(null); }}
+                  className="w-full py-2.5 rounded-xl font-bold text-xs text-white cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)' }}
+                >Close</button>
               </div>
             ) : (
               <div>
-                <div className="w-10 h-10 rounded-xl bg-navy-100 text-navy-800 flex items-center justify-center mb-3">
-                  <Key className="w-5 h-5" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 font-display mb-1">Reset Password</h3>
-                <p className="text-xs text-slate-600 mb-5 font-normal">
-                  Enter your registered mobile number, email, or username to receive password reset instructions.
-                </p>
-
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-iris-600 to-iris-500 flex items-center justify-center mb-3 shadow-lg"><Key className="w-5 h-5 text-white" /></div>
+                <h3 className="text-xl font-bold text-white font-display mb-1">Reset Password</h3>
+                <p className="text-xs text-slate-500 mb-5">Enter your registered identifier to receive reset instructions.</p>
                 <form onSubmit={handleForgotSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1">Registered Identifier</label>
-                    <input
-                      type="text"
-                      required
-                      value={forgotEmail}
-                      onChange={(e) => setForgotEmail(e.target.value)}
-                      placeholder="e.g. 9876543210 or email@campusos.edu"
-                      className="glass-input w-full px-3.5 py-2.5 text-sm rounded-xl font-medium text-slate-900"
-                    />
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Registered Identifier</label>
+                    <input type="text" required value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="e.g. email@campusos.edu" className="input-dark" />
                   </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 rounded-xl bg-navy-800 hover:bg-navy-900 text-white font-bold text-xs transition-colors cursor-pointer"
-                  >
-                    Send Reset Link / OTP
-                  </button>
+                  <button type="submit"
+                    className="w-full py-2.5 rounded-xl font-bold text-xs text-white cursor-pointer"
+                    style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)', boxShadow: '0 4px 15px rgba(124, 58, 237, 0.2)' }}
+                  >Send Reset Link</button>
                 </form>
               </div>
             )}

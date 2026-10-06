@@ -6,7 +6,7 @@ import { ClassTeacherCard } from '../../components/common/ClassTeacherCard';
 import {
   HeartHandshake, CheckSquare, BookOpen, Clock, Calendar, Megaphone,
   CheckCircle2, ArrowRight, Award, Trophy, Sparkles, TrendingUp,
-  CreditCard, MessageSquare, ChevronDown, User, AlertCircle
+  CreditCard, MessageSquare, ChevronDown, User, AlertCircle, Activity
 } from 'lucide-react';
 
 export const ParentDashboard: React.FC = () => {
@@ -26,28 +26,8 @@ export const ParentDashboard: React.FC = () => {
           validChildren.length > 0
             ? validChildren
             : [
-                {
-                  id: 'stu_1',
-                  first_name: 'Arav',
-                  last_name: 'Patel',
-                  grade: 'Grade 10',
-                  section: 'A',
-                  student_id: 'STU-2026-8841',
-                  attendance_pct: 96.4,
-                  gpa: 3.92,
-                  house: 'Orion Blue',
-                },
-                {
-                  id: 'stu_2',
-                  first_name: 'Diya',
-                  last_name: 'Patel',
-                  grade: 'Grade 7',
-                  section: 'A',
-                  student_id: 'STU-2026-5120',
-                  attendance_pct: 97.8,
-                  gpa: 3.88,
-                  house: 'Orion Blue',
-                },
+                { id: 'stu_1', first_name: 'Arav', last_name: 'Patel', grade: 'Grade 10', section: 'A', student_id: 'STU-2026-8841', attendance_pct: 96.4, gpa: 3.92, house: 'Orion Blue' },
+                { id: 'stu_2', first_name: 'Diya', last_name: 'Patel', grade: 'Grade 7', section: 'A', student_id: 'STU-2026-5120', attendance_pct: 97.8, gpa: 3.88, house: 'Orion Blue' },
               ]
         );
       } catch (err) {
@@ -60,14 +40,8 @@ export const ParentDashboard: React.FC = () => {
   }, []);
 
   const activeChild = children[selectedChildIndex] || {
-    first_name: 'Arav',
-    last_name: 'Patel',
-    grade: 'Grade 10',
-    section: 'A',
-    student_id: 'STU-2026-8841',
-    attendance_pct: 96.4,
-    gpa: 3.92,
-    house: 'Orion Blue',
+    first_name: 'Arav', last_name: 'Patel', grade: 'Grade 10', section: 'A',
+    student_id: 'STU-2026-8841', attendance_pct: 96.4, gpa: 3.92, house: 'Orion Blue',
   };
 
   const childScorecards: Record<string, any[]> = {
@@ -78,46 +52,49 @@ export const ParentDashboard: React.FC = () => {
       { subject: 'English Literature', marks: 91, max: 100, grade: 'A', feedback: 'Nuanced comparative essay analysis.' },
     ],
     Diya: [
-      { subject: 'General Science & Botany', marks: 97, max: 100, grade: 'A+', feedback: 'Exceptional observational notes & sketches.' },
-      { subject: 'Mathematics & Algebra', marks: 98, max: 100, grade: 'A+', feedback: 'Flawless arithmetic and geometric proofs.' },
-      { subject: 'Computer Science Basics', marks: 99, max: 100, grade: 'A+', feedback: 'Top performer in visual block coding.' },
-      { subject: 'English & Rhetoric', marks: 95, max: 100, grade: 'A+', feedback: 'Vibrant vocabulary and speech delivery.' },
+      { subject: 'General Science & Botany', marks: 97, max: 100, grade: 'A+', feedback: 'Exceptional observational notes.' },
+      { subject: 'Mathematics & Algebra', marks: 98, max: 100, grade: 'A+', feedback: 'Flawless arithmetic proofs.' },
+      { subject: 'Computer Science Basics', marks: 99, max: 100, grade: 'A+', feedback: 'Top performer in block coding.' },
+      { subject: 'English & Rhetoric', marks: 95, max: 100, grade: 'A+', feedback: 'Vibrant vocabulary and delivery.' },
     ],
   };
 
   const currentScorecard = childScorecards[activeChild.first_name] || childScorecards.Arav;
 
+  const kpiCards = [
+    { label: 'Attendance', value: `${activeChild.attendance_pct || 96.4}%`, sub: 'Present Today', icon: CheckSquare, gradient: 'from-emerald-600 to-emerald-500', glow: 'rgba(16, 185, 129, 0.15)' },
+    { label: 'Term 1 GPA', value: `${activeChild.gpa || 3.92}`, sub: 'Grade Rank: Top 2%', icon: Award, gradient: 'from-blue-600 to-indigo-600', glow: 'rgba(99, 102, 241, 0.15)' },
+    { label: 'Fee Status', value: 'Paid', sub: 'Receipt #REC-2026-8941', icon: CreditCard, gradient: 'from-cyan-600 to-teal-600', glow: 'rgba(6, 182, 212, 0.15)' },
+    { label: 'Next PTM', value: 'Oct 4', sub: 'Parent-Teacher Conclave', icon: MessageSquare, gradient: 'from-iris-600 to-iris-500', glow: 'rgba(124, 58, 237, 0.15)' },
+  ];
+
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {/* Welcome Header with Multi-Child Dropdown Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+    <div className="space-y-6">
+      {/* Welcome */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-6" style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.06)' }}>
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-teal-600 mb-1">
-            <HeartHandshake className="w-4 h-4" />
-            <span>Family & Parent Advisory Portal</span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="badge badge-amber"><HeartHandshake className="w-3 h-3" /> Family Portal</span>
+            <span className="badge badge-emerald"><Activity className="w-3 h-3" /> Live</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
             Welcome, {user?.fullName || 'Rajesh Patel'}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Oakridge Parent Association • Monitoring {children.length || 2} Linked Children
-          </p>
+          <p className="text-sm text-slate-400 mt-1">Oakridge Parent Association • {children.length || 2} Linked Children</p>
         </div>
 
-        {/* Multi-Child Switcher Tabs */}
+        {/* Child Switcher */}
         {children.length > 0 && (
-          <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
-            <span className="text-xs font-bold text-slate-500 px-2 hidden sm:inline">Active Child:</span>
+          <div className="flex items-center gap-2 p-1.5 rounded-xl" style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(148, 163, 184, 0.08)' }}>
+            <span className="text-xs font-bold text-slate-500 px-2 hidden sm:inline">Child:</span>
             {children.map((child, idx) => (
-              <button
-                key={child.id}
-                type="button"
-                onClick={() => setSelectedChildIndex(idx)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              <button key={child.id} type="button" onClick={() => setSelectedChildIndex(idx)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   selectedChildIndex === idx
-                    ? 'bg-navy-800 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    ? 'text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
                 }`}
+                style={selectedChildIndex === idx ? { background: 'linear-gradient(135deg, #7c3aed, #6366f1)', boxShadow: '0 4px 15px rgba(124, 58, 237, 0.25)' } : {}}
               >
                 <User className="w-3.5 h-3.5" />
                 <span>{child.first_name} ({child.grade})</span>
@@ -127,125 +104,70 @@ export const ParentDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Child Overview KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Attendance Rate</span>
-            <CheckSquare className="w-5 h-5 text-teal-600" />
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {kpiCards.map((kpi, i) => (
+          <div key={kpi.label} className={`relative rounded-2xl p-5 overflow-hidden transition-all duration-300 hover:-translate-y-1 animate-fadeInUp stagger-${i + 1}`}
+            style={{ background: 'rgba(15, 23, 42, 0.45)', border: '1px solid rgba(148, 163, 184, 0.08)', boxShadow: `0 4px 24px rgba(0,0,0,0.2), 0 0 40px ${kpi.glow}` }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">{kpi.label}</span>
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${kpi.gradient} flex items-center justify-center shadow-lg`}><kpi.icon className="w-4 h-4 text-white" /></div>
+            </div>
+            <div className="stat-number text-2xl sm:text-3xl">{kpi.value}</div>
+            <div className="text-[11px] text-slate-500 mt-1">{kpi.sub}</div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-teal-700 font-display">
-            {activeChild.attendance_pct || 96.4}%
-          </div>
-          <div className="text-[11px] text-teal-700 font-bold mt-1">Status: Present in Class Today</div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Term 1 GPA</span>
-            <Award className="w-5 h-5 text-blue-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-blue-800 font-display">
-            {activeChild.gpa || 3.92} / 4.0
-          </div>
-          <div className="text-[11px] text-slate-600 font-medium mt-1">Grade Rank: Top 2%</div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">School Fee Dues</span>
-            <CreditCard className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700 font-display">Paid in Full</div>
-          <div className="text-[11px] text-emerald-800 font-semibold mt-1">Receipt #REC-2026-8941</div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Teacher Advisory</span>
-            <MessageSquare className="w-5 h-5 text-purple-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">Oct 4</div>
-          <div className="text-[11px] text-purple-800 font-semibold mt-1">Parent-Teacher Conclave</div>
-        </div>
+        ))}
       </div>
 
-      {/* Child Academic Records & Leave Submission */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Academic Marks Summary */}
-        <div className="lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
+      {/* Scorecard & Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-8 rounded-2xl p-6 space-y-4" style={{ background: 'rgba(15, 23, 42, 0.45)', border: '1px solid rgba(148, 163, 184, 0.08)' }}>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-slate-900 font-display">
-                {activeChild.first_name}'s Term 1 Scorecard
-              </h3>
+              <h3 className="text-sm font-bold text-white font-display">{activeChild.first_name}'s Scorecard</h3>
               <p className="text-xs text-slate-500">{activeChild.grade} Section {activeChild.section} • Board Certified</p>
             </div>
-            <Link to="/performance" className="text-xs font-bold text-teal-600 hover:underline">
-              Detailed Analytics
-            </Link>
+            <Link to="/performance" className="text-xs font-bold text-iris-400 hover:text-iris-300 transition-colors">Full Analytics</Link>
           </div>
-
-          <div className="space-y-3">
+          <div className="space-y-2">
             {currentScorecard.map((sub, idx) => (
-              <div key={idx} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+              <div key={idx} className="p-3.5 rounded-xl flex items-center justify-between text-xs"
+                style={{ background: 'rgba(15, 23, 42, 0.3)', border: '1px solid rgba(148, 163, 184, 0.05)' }}
+              >
                 <div>
-                  <div className="font-bold text-slate-900">{sub.subject}</div>
+                  <div className="font-bold text-white">{sub.subject}</div>
                   <div className="text-slate-500 mt-0.5">{sub.feedback}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-bold text-slate-900">{sub.marks} / {sub.max}</div>
-                  <span className="px-2 py-0.5 rounded bg-teal-100 text-teal-800 font-bold text-[10px]">
-                    Grade {sub.grade}
-                  </span>
+                  <div className="font-bold text-white">{sub.marks} / {sub.max}</div>
+                  <span className="badge badge-emerald text-[9px]">Grade {sub.grade}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Parent Actions */}
-        <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
-          <h3 className="text-base font-bold text-slate-900 font-display">Parent Actions</h3>
-          
-          <div className="space-y-3">
-            <Link
-              to="/leave"
-              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between text-xs font-semibold text-slate-800"
-            >
-              <div className="flex items-center gap-2.5">
-                <Clock className="w-4 h-4 text-amber-600" />
-                <span>Submit Child Absence Leave</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-
-            <Link
-              to="/events"
-              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between text-xs font-semibold text-slate-800"
-            >
-              <div className="flex items-center gap-2.5">
-                <Calendar className="w-4 h-4 text-teal-600" />
-                <span>Book Teacher Advisory Slot</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-
-            <Link
-              to="/announcements"
-              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between text-xs font-semibold text-slate-800"
-            >
-              <div className="flex items-center gap-2.5">
-                <Megaphone className="w-4 h-4 text-blue-600" />
-                <span>School Circulars & Bus Routes</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+        <div className="lg:col-span-4 rounded-2xl p-6 space-y-4" style={{ background: 'rgba(15, 23, 42, 0.45)', border: '1px solid rgba(148, 163, 184, 0.08)' }}>
+          <h3 className="text-sm font-bold text-white font-display">Parent Actions</h3>
+          <div className="space-y-2">
+            {[
+              { to: '/leave', icon: Clock, label: 'Submit Absence Leave', color: 'text-amber-400' },
+              { to: '/events', icon: Calendar, label: 'Book Advisory Slot', color: 'text-cyan-400' },
+              { to: '/announcements', icon: Megaphone, label: 'Circulars & Bus Routes', color: 'text-iris-400' },
+            ].map((action) => (
+              <Link key={action.to} to={action.to}
+                className="p-3.5 rounded-xl flex items-center justify-between text-xs font-semibold text-slate-300 hover:text-white transition-all hover:bg-slate-800/30"
+                style={{ background: 'rgba(15, 23, 42, 0.3)', border: '1px solid rgba(148, 163, 184, 0.05)' }}
+              >
+                <div className="flex items-center gap-2.5"><action.icon className={`w-4 h-4 ${action.color}`} /><span>{action.label}</span></div>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
+              </Link>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Class Teacher & Faculty Mentor Section for Active Child */}
       <ClassTeacherCard
         classKey={activeChild.grade === 'Grade 7' ? 'Grade 7A' : 'Grade 10A'}
         studentName={`${activeChild.first_name} ${activeChild.last_name}`}
