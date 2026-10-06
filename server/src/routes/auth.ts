@@ -66,13 +66,21 @@ router.post('/login', async (req: Request, res: Response) => {
     const cleanId = identifier.trim().toLowerCase();
 
     // Query user by email, username, student_id, or phone
-    const user = db.prepare(`
+    const matchingUsers = db.prepare(`
       SELECT * FROM users 
       WHERE LOWER(email) = ? 
          OR LOWER(username) = ? 
          OR LOWER(student_id) = ? 
          OR phone = ?
-    `).get(cleanId, cleanId, cleanId, identifier.trim()) as any;
+    `).all(cleanId, cleanId, cleanId, identifier.trim()) as any[];
+
+    // A shared portal login can map to a separate account for each role. Use
+    // the role selected on the login page to choose the matching account.
+    const requestedRole = expectedRole && expectedRole !== 'ANY' ? expectedRole : null;
+    const user = requestedRole
+      ? matchingUsers.find((candidate) => candidate.role === requestedRole)
+        || matchingUsers.find((candidate) => candidate.role === 'SUPER_ADMIN')
+      : matchingUsers[0];
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid login credentials. Please verify your ID and try again.' });

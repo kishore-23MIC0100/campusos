@@ -1,0 +1,10 @@
+.git
+.vercel
+.env*
+**/.env*
+**/node_modules
+client/dist
+server/dist
+server/data/
+CampusOS_System_Architecture.pdf
+generate_pdf.py
