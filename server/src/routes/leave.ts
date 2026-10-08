@@ -13,8 +13,9 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
     let query = 'SELECT * FROM leave_requests WHERE 1=1';
     const params: any[] = [];
 
-    // If user is student or parent or teacher without admin role, show only their requests unless admin
-    if (req.user!.role === 'STUDENT') {
+    // Only administrators review the institution-wide queue. Every other role
+    // sees its own requests, so staff and faculty can track their applications.
+    if (!['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user!.role) && req.user!.role !== 'PARENT') {
       query += ' AND (applicant_id = ? OR applicant_name LIKE ?)';
       params.push(req.user!.id, `%${req.user!.fullName}%`);
     } else if (req.user!.role === 'PARENT') {
@@ -44,7 +45,9 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
     const leaves = db.prepare(query).all(...params);
 
     // Compute analytics
-    const allLeaves = db.prepare('SELECT status, leave_type FROM leave_requests').all() as any[];
+    const allLeaves = ['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user!.role)
+      ? db.prepare('SELECT status, leave_type FROM leave_requests').all() as any[]
+      : leaves as any[];
     const analytics = {
       total: allLeaves.length,
       pending: allLeaves.filter(l => l.status === 'PENDING').length,
@@ -88,19 +91,22 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
       'PENDING'
     );
 
-    // Notify admin
-    db.prepare(`
+    // Put the request in both leadership inboxes, independent of which admin
+    // account is used to review leave.
+    const reviewers = db.prepare("SELECT id, role FROM users WHERE role IN ('SUPER_ADMIN', 'SCHOOL_ADMIN') AND status = 'APPROVED'").all() as any[];
+    const insertNotification = db.prepare(`
       INSERT INTO notifications (id, user_id, target_role, title, message, type, link_url)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      `notif_${Date.now()}`,
-      'usr_admin_1',
-      'SUPER_ADMIN',
+    `);
+    reviewers.forEach((reviewer, index) => insertNotification.run(
+      `notif_${Date.now()}_${index}`,
+      reviewer.id,
+      reviewer.role,
       `New ${leaveType} Leave Request: ${req.user!.fullName}`,
       `${req.user!.fullName} (${req.user!.role}) submitted a leave application for ${fromDate} to ${toDate}.`,
       'LEAVE',
       '/leave'
-    );
+    ));
 
     logAudit(
       req.user!.id,
@@ -122,6 +128,7 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
 // Approve leave request
 router.put('/:id/approve', authMiddleware, (req: Request, res: Response) => {
   try {
+    if (!['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user!.role)) return res.status(403).json({ error: 'Only administrators can approve leave requests.' });
     const { id } = req.params;
     const { remarks } = req.body;
     const db = getDb();
@@ -170,6 +177,7 @@ router.put('/:id/approve', authMiddleware, (req: Request, res: Response) => {
 // Reject leave request
 router.put('/:id/reject', authMiddleware, (req: Request, res: Response) => {
   try {
+    if (!['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user!.role)) return res.status(403).json({ error: 'Only administrators can decline leave requests.' });
     const { id } = req.params;
     const { remarks } = req.body;
     const db = getDb();

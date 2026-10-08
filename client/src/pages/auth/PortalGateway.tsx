@@ -95,7 +95,7 @@ export const PortalGateway: React.FC = () => {
     },
     {
       id: 'teacher',
-      title: 'Faculty & Staff',
+      title: 'Faculty Portal',
       tagline: 'Teachers & Dept. Leads',
       path: '/teacher/login',
       gradient: 'from-cyan-600 to-teal-600',
@@ -108,7 +108,7 @@ export const PortalGateway: React.FC = () => {
         'Assignment distribution & evaluation',
         'Student diagnostic & progress records',
       ],
-      userHint: 'Staff Email (e.g. priya.nair@campusos.edu)',
+      userHint: 'Faculty Email (e.g. priya.nair@campusos.edu)',
     },
     {
       id: 'parent',
@@ -129,8 +129,8 @@ export const PortalGateway: React.FC = () => {
     },
     {
       id: 'admin',
-      title: 'Admin Console',
-      tagline: 'Principal & Governance',
+      title: 'Admin & Staff Portal',
+      tagline: 'Leadership & Campus Operations',
       path: '/admin/login',
       gradient: 'from-iris-600 to-purple-700',
       glowColor: 'rgba(124, 58, 237, 0.2)',
@@ -138,11 +138,11 @@ export const PortalGateway: React.FC = () => {
       badgeClass: 'badge-iris',
       icon: <Building2 className="w-6 h-6" />,
       features: [
-        'Unified operations & enrollment control',
-        'Multi-role verification & access queue',
-        'Real-time institutional KPI analytics',
+        'Choose Admin or Staff at sign in',
+        'Separate credentials and role-based access',
+        'Administration tools for approved leaders',
       ],
-      userHint: 'Admin Email (e.g. admin@campusos.edu)',
+      userHint: 'Admin or Staff Email / Employee ID',
     },
   ];
 

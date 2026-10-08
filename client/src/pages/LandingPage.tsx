@@ -317,7 +317,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* 1. Admin Portal */}
+            {/* 1. Shared Admin & Staff Portal */}
             <Link
               to="/admin/login"
               className="group p-6 sm:p-7 rounded-3xl bg-white border border-slate-200/90 hover:border-indigo-400 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col justify-between hover:-translate-y-1"
@@ -327,14 +327,14 @@ export const LandingPage: React.FC = () => {
                   <Building2 className="w-6 h-6" />
                 </div>
                 <h3 className="text-lg font-extrabold text-slate-900 font-display mb-1.5">
-                  School Admin
+                  Admin & Staff Portal
                 </h3>
                 <p className="text-xs text-slate-600 leading-relaxed font-normal mb-4">
-                  Institutional analytics, user verification queue, timetable management & governance.
+                  Choose Administrator or Staff at sign in. Each role has separate credentials and role-based access.
                 </p>
               </div>
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-700 group-hover:text-indigo-900">
-                <span>Enter Admin Portal</span>
+                <span>Enter Admin & Staff Portal</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>
@@ -349,14 +349,14 @@ export const LandingPage: React.FC = () => {
                   <GraduationCap className="w-6 h-6" />
                 </div>
                 <h3 className="text-lg font-extrabold text-slate-900 font-display mb-1.5">
-                  Faculty & Teaching
+                  Faculty Portal
                 </h3>
                 <p className="text-xs text-slate-600 leading-relaxed font-normal mb-4">
-                  One-tap classroom attendance, assignment grading, syllabus tracking & schedule.
+                  Faculty-only access for classroom attendance, assignment grading, assessments, and schedules.
                 </p>
               </div>
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-teal-700 group-hover:text-teal-900">
-                <span>Enter Teacher Portal</span>
+                <span>Enter Faculty Portal</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>

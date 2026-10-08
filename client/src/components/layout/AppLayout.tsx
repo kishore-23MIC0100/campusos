@@ -96,7 +96,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     {
       label: 'Overview',
       items: [
-        { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['ALL'] },
+        { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['ALL', 'STAFF'] },
       ]
     },
     {
@@ -122,15 +122,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       label: 'Operations',
       items: [
         { label: 'Payroll', icon: DollarSign, path: '/payroll', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
-        { label: 'Transport', icon: Bus, path: '/transport', roles: ['ALL'] },
-        { label: 'Leave', icon: CalendarDays, path: '/leave', roles: ['ALL'] },
+        { label: 'Transport', icon: Bus, path: '/transport', roles: ['ALL', 'STAFF'] },
+        { label: 'Leave', icon: CalendarDays, path: '/leave', roles: ['ALL', 'STAFF'] },
       ]
     },
     {
       label: 'Community',
       items: [
-        { label: 'Events', icon: Calendar, path: '/events', roles: ['ALL'] },
-        { label: 'Announcements', icon: Megaphone, path: '/announcements', roles: ['ALL'] },
+        { label: 'Events', icon: Calendar, path: '/events', roles: ['ALL', 'STAFF'] },
+        { label: 'Announcements', icon: Megaphone, path: '/announcements', roles: ['ALL', 'STAFF'] },
         { label: 'Spotlight', icon: Sparkles, path: '/spotlight', roles: ['ALL'] },
       ]
     },
@@ -233,8 +233,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           {/* Navigation Items */}
           <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
             {navGroups.map((group) => {
-              const filteredItems = group.items.filter(
-                (item) => item.roles.includes('ALL') || (user && item.roles.includes(user.role))
+              const filteredItems = group.items.filter((item) =>
+                (item.roles.includes('ALL') && user?.role !== 'STAFF') || Boolean(user && item.roles.includes(user.role))
               );
               if (filteredItems.length === 0) return null;
 

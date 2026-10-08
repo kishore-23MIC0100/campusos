@@ -9,10 +9,10 @@ import {
   BookOpen, PhoneCall, MessageSquare, Info, Zap
 } from 'lucide-react';
 
-export type PortalRole = 'admin' | 'teacher' | 'student' | 'parent';
+export type PortalRole = 'admin' | 'staff' | 'teacher' | 'student' | 'parent';
 
 interface RoleConfig {
-  roleKey: 'SUPER_ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
+  roleKey: 'SUPER_ADMIN' | 'SCHOOL_ADMIN' | 'STAFF' | 'TEACHER' | 'STUDENT' | 'PARENT';
   portalPath: string;
   badgeLabel: string;
   portalTitle: string;
@@ -50,8 +50,8 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     identifierPlaceholder: 'e.g. admin@campusos.edu',
     identifierType: 'text',
     buttonLabel: 'Sign In to Admin Portal',
-    defaultIdentifier: 'kishore.sivakumar34@gmail.com',
-    defaultPassword: 'Admin123',
+    defaultIdentifier: 'admin@campusos.edu',
+    defaultPassword: 'Admin@2026',
     roleName: 'Admin',
     floatingFeature: 'Institutional Oversight • Multi-Tenant RBAC',
     gradient: 'from-iris-600 to-purple-700',
@@ -61,6 +61,34 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     roleIcon: <Building2 className="w-5 h-5 text-white" />,
     otherRoles: [
       { key: 'teacher', label: 'Teacher Login', path: '/teacher/login' },
+      { key: 'student', label: 'Student Login', path: '/student/login' },
+      { key: 'parent', label: 'Parent Login', path: '/parent/login' },
+    ],
+  },
+  staff: {
+    roleKey: 'STAFF',
+    portalPath: '/admin/login',
+    badgeLabel: 'ADMIN & STAFF PORTAL',
+    portalTitle: 'Staff Sign In',
+    portalSubtitle: 'Staff services, leave status & campus operations',
+    heroHeadline: 'Keep campus operations moving, with the right tools at hand.',
+    heroSubline: 'Access staff services and your own leave records through a dedicated, role-limited workspace.',
+    identifierLabel: 'Staff Email or Employee ID',
+    identifierHint: 'Use your school-issued staff email or employee code',
+    identifierPlaceholder: 'e.g. robert.fox@campusos.edu',
+    identifierType: 'text',
+    buttonLabel: 'Sign In to Staff Portal',
+    defaultIdentifier: '',
+    defaultPassword: '',
+    roleName: 'Staff',
+    floatingFeature: 'Staff Self-Service • Leave Tracking',
+    gradient: 'from-teal-600 to-cyan-700',
+    glowColor: 'rgba(13, 148, 136, 0.2)',
+    badgeClass: 'badge-cyan',
+    iconGradient: 'from-teal-600 to-cyan-600',
+    roleIcon: <Users className="w-5 h-5 text-white" />,
+    otherRoles: [
+      { key: 'teacher', label: 'Faculty Login', path: '/teacher/login' },
       { key: 'student', label: 'Student Login', path: '/student/login' },
       { key: 'parent', label: 'Parent Login', path: '/parent/login' },
     ],
@@ -78,8 +106,8 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     identifierPlaceholder: 'e.g. priya.nair@campusos.edu',
     identifierType: 'text',
     buttonLabel: 'Sign In to Teacher Portal',
-    defaultIdentifier: 'kishore.sivakumar34@gmail.com',
-    defaultPassword: 'Admin123',
+    defaultIdentifier: 'priya.nair@campusos.edu',
+    defaultPassword: 'Teacher@2026',
     roleName: 'Teacher',
     floatingFeature: 'Smart Classroom Sync • Live Gradebook',
     gradient: 'from-cyan-600 to-teal-600',
@@ -106,8 +134,8 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     identifierPlaceholder: 'e.g. arav.patel@campusos.edu',
     identifierType: 'text',
     buttonLabel: 'Sign In to Student Portal',
-    defaultIdentifier: 'kishore.sivakumar34@gmail.com',
-    defaultPassword: 'Admin123',
+    defaultIdentifier: 'STU-2026-8841',
+    defaultPassword: 'Student@2026',
     roleName: 'Student',
     floatingFeature: 'Automated GPA • Interactive Assignments',
     gradient: 'from-blue-600 to-indigo-600',
@@ -134,8 +162,8 @@ const ROLE_CONFIGS: Record<PortalRole, RoleConfig> = {
     identifierPlaceholder: 'e.g. rajesh.patel@gmail.com',
     identifierType: 'text',
     buttonLabel: 'Sign In to Parent Portal',
-    defaultIdentifier: 'kishore.sivakumar34@gmail.com',
-    defaultPassword: 'Admin123',
+    defaultIdentifier: 'rajesh.patel@gmail.com',
+    defaultPassword: 'Parent@2026',
     roleName: 'Parent',
     floatingFeature: 'Multi-Child Linkage • Real-time Alerts',
     gradient: 'from-amber-500 to-orange-600',
@@ -156,11 +184,12 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
   const location = useLocation();
   const { login } = useAuth();
 
+  const [adminStaffRole, setAdminStaffRole] = useState<PortalRole>(initialRole === 'staff' ? 'staff' : 'admin');
   const currentRole: PortalRole = (() => {
     if (location.pathname.includes('/teacher')) return 'teacher';
     if (location.pathname.includes('/student')) return 'student';
     if (location.pathname.includes('/parent')) return 'parent';
-    if (location.pathname.includes('/admin')) return 'admin';
+    if (location.pathname.includes('/admin')) return adminStaffRole;
     return initialRole;
   })();
 
@@ -194,6 +223,19 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
 
   const heroRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    setReqRole(config.roleKey);
+  }, [config.roleKey]);
+
+  const switchAdminStaffRole = (role: 'admin' | 'staff') => {
+    setAdminStaffRole(role);
+    setIdentifier('');
+    setPassword('');
+    setErrorMessage(null);
+    setPendingState(null);
+    setRoleMismatchAlert(null);
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!heroRef.current) return;
@@ -270,6 +312,7 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
   };
   const roleHeroImage = {
     admin: '/assets/heroes/admin_hero.jpg',
+    staff: '/assets/heroes/admin_hero.jpg',
     teacher: '/assets/heroes/teacher_hero.jpg',
     student: '/assets/heroes/student_hero.jpg',
     parent: '/assets/heroes/parent_hero.jpg',
@@ -393,6 +436,19 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-iris-500/20 to-transparent" />
 
             <div>
+              {location.pathname.includes('/admin') && (
+                <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-1.5">
+                  <span className="px-2 text-xs font-semibold text-slate-500">Admin & Staff portal</span>
+                  <div className="flex rounded-lg bg-white p-1 shadow-sm">
+                    {(['admin', 'staff'] as const).map((role) => (
+                      <button key={role} type="button" onClick={() => switchAdminStaffRole(role)}
+                        aria-pressed={currentRole === role}
+                        className={`rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${currentRole === role ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                      >{role === 'admin' ? 'Administrator' : 'Staff'}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Role Header */}
               <div className="mb-6 pb-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.06)' }}>
                 <div className="flex items-center gap-3">
@@ -644,7 +700,7 @@ export const DedicatedLogin: React.FC<{ initialRole?: PortalRole }> = ({ initial
                     <div><label className="block text-xs font-semibold text-slate-300 mb-1">Email *</label><input type="email" required value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} placeholder="name@campusos.edu" className="input-dark" /></div>
                     <div><label className="block text-xs font-semibold text-slate-300 mb-1">Role *</label>
                       <select value={reqRole} onChange={(e) => setReqRole(e.target.value as any)} className="input-dark">
-                        <option value="TEACHER">Teacher</option><option value="STUDENT">Student</option><option value="PARENT">Parent</option><option value="SCHOOL_ADMIN">Admin</option>
+                        <option value="TEACHER">Teacher</option><option value="STAFF">Staff</option><option value="STUDENT">Student</option><option value="PARENT">Parent</option><option value="SCHOOL_ADMIN">Admin</option>
                       </select>
                     </div>
                   </div>

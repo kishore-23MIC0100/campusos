@@ -4,6 +4,7 @@ import { AdminDashboard } from './AdminDashboard';
 import { TeacherDashboard } from './TeacherDashboard';
 import { StudentDashboard } from './StudentDashboard';
 import { ParentDashboard } from './ParentDashboard';
+import { StaffDashboard } from './StaffDashboard';
 import { Navigate } from 'react-router-dom';
 
 export const DashboardDispatcher: React.FC = () => {
@@ -34,6 +35,8 @@ export const DashboardDispatcher: React.FC = () => {
       return <div className="campus-dashboard-page"><StudentDashboard /></div>;
     case 'PARENT':
       return <div className="campus-dashboard-page"><ParentDashboard /></div>;
+    case 'STAFF':
+      return <div className="campus-dashboard-page"><StaffDashboard /></div>;
     default:
       return <div className="campus-dashboard-page"><AdminDashboard /></div>;
   }

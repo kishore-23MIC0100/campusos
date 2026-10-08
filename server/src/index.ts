@@ -5,6 +5,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { initDatabase } from './db.js';
 import { seedDatabase } from './seed.js';
+import { authMiddleware } from './middleware/auth.js';
 
 import authRoutes from './routes/auth.js';
 import usersRoutes from './routes/users.js';
@@ -70,6 +71,11 @@ if (!process.env.VERCEL) {
     try {
       finishRequest = await db.beginRequest();
       if (!db.hasUsers()) await seedDatabase();
+      if (!db.prepare('SELECT id FROM roles WHERE name = ?').get('STAFF')) {
+        db.prepare('INSERT INTO roles (id, name, description, is_system) VALUES (?, ?, ?, ?)')
+          .run('role_staff', 'STAFF', 'Non-teaching staff self-service access', 1);
+        db.scheduleSave();
+      }
 
       const originalEnd = res.end.bind(res);
       let ending = false;
@@ -118,6 +124,25 @@ app.get('/api/health', (req, res) => {
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
+// Staff accounts share the Admin & Staff sign-in screen, but their server-side
+// API access is limited to self-service and campus information endpoints.
+app.use('/api', (req, res, next) => {
+  if (!req.headers.authorization) return next();
+  authMiddleware(req, res, () => {
+    if (req.user?.role !== 'STAFF') return next();
+    const path = req.path.replace(/\/$/, '') || '/';
+    const allowed =
+      (path === '/leave' && ['GET', 'POST'].includes(req.method)) ||
+      (path === '/events' && req.method === 'GET') ||
+      (/^\/events\/[^/]+\/rsvp$/.test(path) && req.method === 'POST') ||
+      (path.startsWith('/announcements') && req.method === 'GET') ||
+      (path.startsWith('/transport') && req.method === 'GET') ||
+      (path === '/notifications' && req.method === 'GET') ||
+      (path.startsWith('/notifications/') && req.method === 'PUT' && (path.endsWith('/read') || path === '/notifications/read-all'));
+    if (!allowed) return res.status(403).json({ error: 'This staff account does not have access to that operation.' });
+    next();
+  });
+});
 app.use('/api/users', usersRoutes);
 app.use('/api/students', studentsRoutes);
 app.use('/api/teachers', teachersRoutes);

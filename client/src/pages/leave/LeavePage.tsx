@@ -23,9 +23,9 @@ export const LeavePage: React.FC = () => {
 
   // New leave form
   const [leaveType, setLeaveType] = useState('CASUAL');
-  const [fromDate, setFromDate] = useState('2026-09-25');
-  const [toDate, setToDate] = useState('2026-09-26');
-  const [totalDays, setTotalDays] = useState(2);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [totalDays, setTotalDays] = useState(1);
   const [reason, setReason] = useState('');
   const [isEmergency, setIsEmergency] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -111,7 +111,7 @@ export const LeavePage: React.FC = () => {
     }
   };
 
-  const isReviewer = user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN' || user?.role === 'TEACHER';
+  const isReviewer = user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN';
 
   return (
     <div className="space-y-6 animate-fadeIn">

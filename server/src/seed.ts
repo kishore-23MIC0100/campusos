@@ -25,6 +25,7 @@ export async function seedDatabase() {
   insertRole.run('role_super_admin', 'SUPER_ADMIN', 'Executive Super Administrator with complete system access', 1);
   insertRole.run('role_school_admin', 'SCHOOL_ADMIN', 'School Operations & Academic Administrator', 1);
   insertRole.run('role_teacher', 'TEACHER', 'Classroom educator, attendance taker, and grade manager', 1);
+  insertRole.run('role_staff', 'STAFF', 'Non-teaching staff self-service access', 1);
   insertRole.run('role_student', 'STUDENT', 'Enrolled student with course, assignment, and timetable access', 1);
   insertRole.run('role_parent', 'PARENT', 'Guardian with multi-child monitoring and communication access', 1);
 
@@ -659,6 +660,10 @@ export async function seedDatabase() {
 
 export function seedNewModules(db: any) {
   const data = db.data;
+  if (!db.prepare('SELECT id FROM roles WHERE name = ?').get('STAFF')) {
+    db.prepare('INSERT INTO roles (id, name, description, is_system) VALUES (?, ?, ?, ?)')
+      .run('role_staff', 'STAFF', 'Non-teaching staff self-service access', 1);
+  }
   if (!data.staff_details || data.staff_details.length === 0) {
     console.log('[Seed] Seeding Faculties and Staff Details...');
     data.staff_details = [

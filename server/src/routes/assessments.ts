@@ -416,13 +416,13 @@ router.post('/:id/submit', authMiddleware, (req, res) => {
       }
     }
     const submissions = (db as any).data.assessment_submissions || ((db as any).data.assessment_submissions = []);
+    const studentIds = studentIdentifiers(student, req.user);
     let quizSession: any = null;
     if (isQuestionAssessment) {
       quizSession = ((db as any).data.assessment_sessions || []).find((session: any) => session.assessment_id === assessment.id && studentIds.has(String(session.student_id)) && !session.completed_at);
       if (!quizSession) return res.status(403).json({ error: 'Start this assessment before submitting.' });
       if (now.getTime() > new Date(quizSession.ends_at).getTime()) return res.status(403).json({ error: 'The assessment time limit has expired.' });
     }
-    const studentIds = studentIdentifiers(student, req.user);
     const previous = submissions.findIndex((s: any) => s.assessment_id === assessment.id && studentIds.has(String(s.student_id)));
     const attemptCount = previous >= 0 ? Number(submissions[previous].attempt_count || 1) : 0;
     const attemptsAllowed = Number(parseJson(assessment.settings, {}).attemptsAllowed || 1);

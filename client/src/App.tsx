@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { LandingPage } from './pages/LandingPage';
@@ -34,6 +34,7 @@ import { AssessmentPortalPage } from './pages/assessments/AssessmentPortalPage';
 // Protected Route Wrapper
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -48,6 +49,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   if (!user) {
     return <Navigate to="/admin/login" replace />;
+  }
+
+  const staffRoutes = ['/dashboard', '/leave', '/transport', '/events', '/announcements', '/settings'];
+  if (user.role === 'STAFF' && !staffRoutes.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`))) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <AppLayout>{children}</AppLayout>;

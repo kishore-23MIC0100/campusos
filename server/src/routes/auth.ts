@@ -77,20 +77,21 @@ router.post('/login', async (req: Request, res: Response) => {
     // A shared portal login can map to a separate account for each role. Use
     // the role selected on the login page to choose the matching account.
     const requestedRole = expectedRole && expectedRole !== 'ANY' ? expectedRole : null;
-    const user = requestedRole
-      ? matchingUsers.find((candidate) => candidate.role === requestedRole)
-        || matchingUsers.find((candidate) => candidate.role === 'SUPER_ADMIN')
-      : matchingUsers[0];
+    const roleCandidates = requestedRole
+      ? requestedRole === 'SUPER_ADMIN'
+        ? matchingUsers.filter((candidate) => candidate.role === 'SUPER_ADMIN' || candidate.role === 'SCHOOL_ADMIN')
+        : matchingUsers.filter((candidate) => candidate.role === requestedRole)
+      : matchingUsers;
+    let user: any = null;
+    for (const candidate of roleCandidates) {
+      if (await bcrypt.compare(password, candidate.password_hash)) {
+        user = candidate;
+        break;
+      }
+    }
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid login credentials. Please verify your ID and try again.' });
-    }
-
-    // Verify password
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-      logAudit(user.id, user.full_name, user.role, 'LOGIN_FAILED', 'AUTH', user.id, `Failed password attempt for ${identifier}`);
-      return res.status(401).json({ error: 'Invalid password. Please check your credentials.' });
     }
 
     // Auto-enable and approve valid user accounts
@@ -104,7 +105,8 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // Check expected role alignment warning/guidance if user opened a specific portal
-    const roleMismatch = expectedRole && expectedRole !== 'ANY' && user.role !== expectedRole && user.role !== 'SUPER_ADMIN';
+    const isAdminPortal = expectedRole === 'SUPER_ADMIN' && ['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(user.role);
+    const roleMismatch = expectedRole && expectedRole !== 'ANY' && user.role !== expectedRole && !isAdminPortal;
 
     const token = generateToken(user);
 
@@ -153,6 +155,8 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const db = getDb();
     const cleanEmail = email.trim().toLowerCase();
+    const allowedRoles = ['TEACHER', 'STAFF', 'STUDENT', 'PARENT', 'SCHOOL_ADMIN'];
+    if (!allowedRoles.includes(String(role).toUpperCase())) return res.status(400).json({ error: 'Choose a supported portal role.' });
     const cleanUsername = (username || email.split('@')[0]).trim().toLowerCase();
 
     // Check if user already exists

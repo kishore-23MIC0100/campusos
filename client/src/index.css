@@ -996,8 +996,13 @@ select.input-dark {
 }
 .campus-dashboard-page [style*="rgba(148, 163, 184"] { border-color: rgba(55,83,103,.13) !important; }
 .campus-dashboard-page .stat-number {
-  background: linear-gradient(125deg,#173c55 0%,#176e73 55%,#554584 100%) !important;
-  -webkit-text-fill-color: transparent;
+  /* Keep KPI values readable in Chromium as well as Safari. Gradient text can
+     fall back to painting the whole block when text clipping is unavailable. */
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  color: #173c55 !important;
+  -webkit-text-fill-color: #173c55 !important;
 }
 .campus-dashboard-page a:hover,
 .campus-dashboard-page button:hover { background-color: rgba(45,91,112,.055); }
