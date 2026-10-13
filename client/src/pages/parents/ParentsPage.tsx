@@ -42,7 +42,7 @@ export const ParentsPage: React.FC = () => {
       {/* Search */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-iris-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}

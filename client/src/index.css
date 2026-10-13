@@ -169,21 +169,21 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .glass-input {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(124, 58, 237, 0.2);
   color: #f1f5f9;
   border-radius: var(--radius-lg);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-input::placeholder {
-  color: #64748b;
+  color: #94a3b8;
 }
 
 .glass-input:focus {
-  border-color: rgba(124, 58, 237, 0.5);
-  background: rgba(15, 23, 42, 0.8);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), 0 0 20px rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.6);
+  background: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2), 0 0 24px rgba(124, 58, 237, 0.1);
   outline: none;
 }
 

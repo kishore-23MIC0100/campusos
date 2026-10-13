@@ -312,7 +312,7 @@ export const StaffManagementPage: React.FC = () => {
       {/* Filter & Search Bar */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <form onSubmit={handleSearchSubmit} className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-iris-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search by name, ID, qualification, email..."
