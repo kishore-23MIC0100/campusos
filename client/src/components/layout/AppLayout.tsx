@@ -393,14 +393,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             <button
               type="button"
               onClick={() => setShowSearchModal(true)}
-              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-slate-500 text-xs font-medium transition-all w-44 sm:w-64 hover:text-slate-300"
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-iris-300 text-xs font-medium transition-all w-44 sm:w-64 hover:text-iris-100"
               style={{
-                background: 'rgba(15, 23, 42, 0.5)',
+                background: 'rgba(15, 23, 42, 0.7)',
                 border: '1px solid rgba(148, 163, 184, 0.08)',
               }}
             >
               <Search className="w-3.5 h-3.5" />
-              <span className="truncate">Search anything...</span>
+              <span className="truncate">Search campus resources...</span>
               <kbd className="hidden sm:inline-flex items-center gap-0.5 ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded-md text-slate-600 font-semibold"
                 style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(148, 163, 184, 0.1)' }}
               >
