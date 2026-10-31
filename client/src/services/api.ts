@@ -202,7 +202,7 @@ async function apiFetch<T>(
     throw new ApiError(
       timeout.signal.aborted
         ? "The request timed out. Check your connection and try again."
-        : "Unable to reach CampusOS. Check your connection and try again.",
+        : "Unable to reach Scholaxys. Check your connection and try again.",
     );
   } finally {
     clearTimeout(timeoutId);
@@ -615,7 +615,9 @@ export const api = {
     limit?: number;
   }) {
     const query = buildQuery(params);
-    return apiFetch<{ logs: any[] }>(`/audit-logs?${query}`);
+    return apiFetch<{ logs: any[]; total: number; actions: string[] }>(
+      `/audit-logs?${query}`,
+    );
   },
 
   // Notifications

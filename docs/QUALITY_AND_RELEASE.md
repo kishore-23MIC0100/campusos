@@ -1,14 +1,15 @@
 # Quality and release record
 
-Recorded 31 October 2026. This record distinguishes local verification from deployment readiness.
+Updated 1 November 2026. This record distinguishes local verification from deployment readiness.
 
 ## Executed checks
 
 | Check | Recorded result |
 | --- | --- |
-| Client service/session unit tests | 15 passed. |
-| Backend authentication, authorization and persistence integration tests | 25 passed in isolated temporary data. |
+| Client service/session, schedule and assessment-state unit tests | 21 passed. |
+| Backend authentication, authorization, demo-family and persistence integration tests | 37 passed in isolated temporary data. |
 | Isolated six-role HTTP system suite | 121 checks passed across SUPER_ADMIN, SCHOOL_ADMIN, TEACHER, STUDENT, PARENT and STAFF. |
+| Shared portal account verification | 39 local checks passed: login and current identity for six roles, audit retrieval and password exclusion. |
 | Local HTTP system smoke | 12 passed against `http://localhost:4000/api` using the staff demo. |
 | Client TypeScript and production bundle | Passed. Three.js and charts are split from the application bundle. |
 | Root/client dependency audit | Zero known vulnerabilities after compatible patch updates. |
@@ -53,3 +54,17 @@ A distinct sensitive `JWT_SECRET` was configured for preview deployments only. T
 - Final deployment URL, tested commit and rollback reference.
 
 The local demo is usable for design review. Client submission as a live production system remains dependent on the database blocker and the acceptance evidence above.
+## Shared portal account update
+
+The owner requested one email/password across all portals and explicitly chose to retain existing accounts. This is implemented as six independent, database-backed role identities. A sensitive server-only configuration stores a bcrypt hash and revision; neither the requested password nor the account identifier is committed to source. Local provisioning, all six logins and the updated audit page were verified. General registration and password-change length rules are unchanged; only the operator provisioning command accepts an explicitly confirmed password of at least eight characters.
+
+New tests cover configuration validation, six-role login isolation, preserving other users, idempotence, later account-status/password changes, credential rotation and session revocation, failed/blocked login auditing, secret exclusion and duplicate-role detection. Provisioning on production activates only after PostgreSQL becomes available; it never bypasses database failures. Existing audit history remains intact.
+
+
+## Scholaxys visual and portal update
+
+The visible product name is Scholaxys. The workspace and assessment portal share midnight navy, electric lime and semantic status tokens, with a persistent light/dark toggle. The administration sign-in has no Staff switch; staff uses its dedicated portal. Existing URLs, database keys and session configuration remain compatible.
+
+The local review accounts have two clearly fictional linked students, recent attendance, subject scores, assignments, weekday schedules, notifications and four assessment formats. The seeder is idempotent, preserves linked academic profiles and refuses production, Vercel and all PostgreSQL connections. The parent dashboard switches between both students. A student cannot use the parent family endpoint even when both role accounts share the same email.
+
+The assessment library, question workspace, timer, code/written response editors, upload flow, grading status and result display have been redesigned. Zero-mark results are treated as completed rather than open work. Browser verification covered dark/light themes, desktop and mobile layouts, a quiz start/answer/submit cycle with a persisted 10/10 result, parent child switching and the administration login. Performance, load and institutional production acceptance remain unmeasured; the external Neon quota still prevents live backend acceptance.

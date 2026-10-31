@@ -76,7 +76,7 @@ export const DedicatedLogin = ({
   const { root, dark, setDark } = usePresentation();
   const { login, user } = useAuth();
   const navigate = useNavigate();
-  const [role, setRole] = useState<PortalRole>(initialRole);
+  const role = initialRole;
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
@@ -87,7 +87,6 @@ export const DedicatedLogin = ({
   const [fullName, setFullName] = useState("");
   const config = configs[role];
   useEffect(() => {
-    setRole(initialRole);
     setError("");
     setNotice("");
     setPassword("");
@@ -166,7 +165,7 @@ export const DedicatedLogin = ({
             fetchPriority="high"
           />
           <div className="signin-visual-content">
-            <span>CampusOS / {config.title}</span>
+            <span>Scholaxys / {config.title}</span>
             <h1>{config.text}</h1>
             <p>{config.description}</p>
           </div>
@@ -190,31 +189,6 @@ export const DedicatedLogin = ({
                 ? "Your school administrator manages account recovery."
                 : "Sign in to continue your school day."}
           </p>
-          {initialRole === "admin" && mode === "login" && (
-            <div
-              className="signin-switch"
-              aria-label="Choose administration or staff"
-            >
-              <button
-                aria-pressed={role === "admin"}
-                onClick={() => {
-                  setRole("admin");
-                  setError("");
-                }}
-              >
-                Administration
-              </button>
-              <button
-                aria-pressed={role === "staff"}
-                onClick={() => {
-                  setRole("staff");
-                  setError("");
-                }}
-              >
-                Staff
-              </button>
-            </div>
-          )}
           {mode === "help" ? (
             <div className="signin-help">
               <ShieldCheck size={27} />
@@ -330,7 +304,7 @@ export const DedicatedLogin = ({
           )}
           {mode === "login" && role !== "admin" ? (
             <p className="signin-new">
-              New to CampusOS?{" "}
+              New to Scholaxys?{" "}
               <button onClick={() => changeMode("request")}>
                 Request access
               </button>
@@ -354,7 +328,7 @@ export const DedicatedLogin = ({
         </section>
       </main>
       <footer className="auth-footer page-width">
-        <span>© {new Date().getFullYear()} CampusOS</span>
+        <span>© {new Date().getFullYear()} Scholaxys</span>
         <Link to="/">Back to campus</Link>
       </footer>
     </div>

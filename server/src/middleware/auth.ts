@@ -122,7 +122,7 @@ export function logAudit(
   entityId: string | null,
   description: string,
   ipAddress: string = '127.0.0.1',
-  userAgent: string = 'CampusOS Client'
+  userAgent: string = 'Scholaxys Client'
 ) {
   try {
     const db = getDb();

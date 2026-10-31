@@ -1,9 +1,9 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Link } from "react-router-dom";
 
 export interface BrandLogoProps {
-  variant?: 'light' | 'dark';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: "light" | "dark";
+  size?: "sm" | "md" | "lg";
   showSubtitle?: boolean;
   showBadge?: boolean;
   badgeText?: string;
@@ -13,45 +13,45 @@ export interface BrandLogoProps {
 }
 
 export const BrandLogo: React.FC<BrandLogoProps> = ({
-  variant = 'light',
-  size = 'md',
+  variant = "light",
+  size = "md",
   showSubtitle = true,
   showBadge = true,
-  badgeText = 'CBSE AFF-9801',
+  badgeText = "CBSE AFF-9801",
   hideIcon = false,
-  className = '',
-  to = '/',
+  className = "",
+  to = "/",
 }) => {
-  const isDark = variant === 'dark';
+  const isDark = variant === "dark";
 
   const iconSizes = {
-    sm: 'w-8 h-8 rounded-xl',
-    md: 'w-10 h-10 rounded-2xl',
-    lg: 'w-12 h-12 rounded-2xl',
+    sm: "w-8 h-8 rounded-xl",
+    md: "w-10 h-10 rounded-2xl",
+    lg: "w-12 h-12 rounded-2xl",
   };
 
   const svgSizes = {
-    sm: 'w-4.5 h-4.5',
-    md: 'w-5.5 h-5.5',
-    lg: 'w-6.5 h-6.5',
+    sm: "w-4.5 h-4.5",
+    md: "w-5.5 h-5.5",
+    lg: "w-6.5 h-6.5",
   };
 
   const textSizes = {
-    sm: 'text-lg',
-    md: 'text-xl',
-    lg: 'text-2xl',
+    sm: "text-lg",
+    md: "text-xl",
+    lg: "text-2xl",
   };
 
   const badgeSizes = {
-    sm: 'text-[9px] px-1.5 py-0.5',
-    md: 'text-[10px] px-2 py-0.5',
-    lg: 'text-[11px] px-2.5 py-0.5',
+    sm: "text-[9px] px-1.5 py-0.5",
+    md: "text-[10px] px-2 py-0.5",
+    lg: "text-[11px] px-2.5 py-0.5",
   };
 
   const subtitleSizes = {
-    sm: 'text-[10px]',
-    md: 'text-[11px]',
-    lg: 'text-xs',
+    sm: "text-[10px]",
+    md: "text-[11px]",
+    lg: "text-xs",
   };
 
   const content = (
@@ -73,18 +73,39 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
             className={`${svgSizes[size]} relative z-10`}
           >
             <defs>
-              <linearGradient id="campusShieldStroke" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#38BDF8" />
-                <stop offset="0.5" stopColor="#0D9488" />
-                <stop offset="1" stopColor="#3B82F6" />
+              <linearGradient
+                id="campusShieldStroke"
+                x1="4"
+                y1="2"
+                x2="28"
+                y2="30"
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop stopColor="#C2F970" />
+                <stop offset="0.5" stopColor="#80B84C" />
+                <stop offset="1" stopColor="#80B84C" />
               </linearGradient>
-              <linearGradient id="campusBookFill" x1="8" y1="8" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#14B8A6" stopOpacity="0.3" />
-                <stop offset="1" stopColor="#0EA5E9" stopOpacity="0.1" />
+              <linearGradient
+                id="campusBookFill"
+                x1="8"
+                y1="8"
+                x2="24"
+                y2="24"
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop stopColor="#C2F970" stopOpacity="0.3" />
+                <stop offset="1" stopColor="#80B84C" stopOpacity="0.1" />
               </linearGradient>
-              <linearGradient id="campusTorch" x1="16" y1="5" x2="16" y2="23" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#F59E0B" />
-                <stop offset="1" stopColor="#0D9488" />
+              <linearGradient
+                id="campusTorch"
+                x1="16"
+                y1="5"
+                x2="16"
+                y2="23"
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop stopColor="#C2F970" />
+                <stop offset="1" stopColor="#80B84C" />
               </linearGradient>
             </defs>
 
@@ -101,7 +122,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
             <path
               d="M16 11.5L8.5 15.5V9.5L16 6.5L23.5 9.5V15.5L16 11.5Z"
               fill="url(#campusBookFill)"
-              stroke="#2DD4BF"
+              stroke="#C2F970"
               strokeWidth="1.3"
               strokeLinejoin="round"
             />
@@ -117,14 +138,14 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
             {/* Base Graduation Chevron */}
             <path
               d="M11 20L16 23.5L21 20"
-              stroke="#38BDF8"
+              stroke="#C2F970"
               strokeWidth="1.4"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
 
             {/* Apex Beacon Light */}
-            <circle cx="16" cy="5.2" r="1.3" fill="#FBBF24" />
+            <circle cx="16" cy="5.2" r="1.3" fill="#E4FFAD" />
           </svg>
         </div>
       )}
@@ -134,18 +155,18 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className={`${textSizes[size]} font-black tracking-tight font-display leading-none ${
-              isDark ? 'text-white' : 'text-slate-900'
+              isDark ? "text-white" : "text-slate-900"
             }`}
           >
-            Campus<span className="text-teal-600 font-black">OS</span>
+            Schol<span className="brand-wordmark-accent font-black">axys</span>
           </span>
 
           {showBadge && (
             <span
               className={`${badgeSizes[size]} font-extrabold uppercase tracking-wider rounded-full border leading-none ${
                 isDark
-                  ? 'bg-teal-500/20 text-teal-300 border-teal-500/30'
-                  : 'bg-teal-50 text-teal-800 border-teal-200 shadow-2xs'
+                  ? "bg-teal-500/20 text-teal-300 border-teal-500/30"
+                  : "bg-teal-50 text-teal-800 border-teal-200 shadow-2xs"
               }`}
             >
               {badgeText}
@@ -156,7 +177,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         {showSubtitle && (
           <p
             className={`${subtitleSizes[size]} font-semibold leading-tight mt-1 truncate ${
-              isDark ? 'text-slate-400' : 'text-slate-500'
+              isDark ? "text-slate-400" : "text-slate-500"
             }`}
           >
             Oakridge International Educational Institutions
@@ -176,4 +197,3 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
 
   return content;
 };
-

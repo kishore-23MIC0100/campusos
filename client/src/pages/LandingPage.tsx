@@ -112,7 +112,7 @@ export const LandingPage = () => {
                 <ArrowRight size={18} />
               </Link>
               <a className="text-link" href="#platform">
-                Discover CampusOS <ChevronDown size={16} />
+                Discover Scholaxys <ChevronDown size={16} />
               </a>
             </div>
           </div>
@@ -148,7 +148,7 @@ export const LandingPage = () => {
           data-reveal
         >
           <div className="section-intro">
-            <span className="section-label">The CampusOS platform</span>
+            <span className="section-label">The Scholaxys platform</span>
             <h2>
               Less administration.
               <br />
@@ -341,7 +341,7 @@ export const LandingPage = () => {
           size="sm"
         />
         <p>People. Learning. Possibility.</p>
-        <span>© {new Date().getFullYear()} CampusOS</span>
+        <span>© {new Date().getFullYear()} Scholaxys</span>
         <a href="#main">Back to top ↑</a>
       </footer>
     </div>

@@ -469,7 +469,7 @@ export const HomeworkPage: React.FC = () => {
               <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-300 text-center text-xs text-slate-500">
                 <Upload className="w-6 h-6 text-slate-400 mx-auto mb-1" />
                 <span className="font-semibold text-slate-700">solution_document_final.pdf</span>
-                <div className="text-[10px] text-slate-400">Attached from CampusOS Workspace</div>
+                <div className="text-[10px] text-slate-400">Attached from Scholaxys Workspace</div>
               </div>
 
               <button

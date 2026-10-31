@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api, type User } from "../../services/api";
 import { BrandLogo } from "../brand/BrandLogo";
+import { useWorkspaceTheme } from "../../hooks/useWorkspaceTheme";
 import {
   LayoutDashboard,
   Users,
@@ -34,6 +35,8 @@ import {
   PanelLeftOpen,
   ChevronRight,
   Check,
+  Sun,
+  Moon,
 } from "lucide-react";
 import "../../workspace.css";
 
@@ -186,6 +189,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme: workspaceTheme, toggleTheme } = useWorkspaceTheme();
   const [mobileViewport, setMobileViewport] = useState(
     () => window.matchMedia("(max-width: 1023px)").matches,
   );
@@ -359,6 +363,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div
       className={`workspace-shell ${collapsed ? "workspace-collapsed" : ""}`}
+      data-workspace-theme={workspaceTheme}
     >
       <a className="workspace-skip" href="#workspace-content">
         Skip to content
@@ -384,7 +389,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             size="sm"
             showSubtitle={false}
             showBadge={false}
-            variant="light"
+            variant={workspaceTheme === "dark" ? "dark" : "light"}
             to="/dashboard"
             className={collapsed ? "workspace-logo-collapsed" : ""}
           />
@@ -491,6 +496,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <strong>{currentPage?.label || "Campus"}</strong>
           </div>
           <div className="workspace-topbar-actions">
+            <button
+              className="workspace-icon-button"
+              aria-label={`Switch to ${workspaceTheme === "dark" ? "light" : "dark"} workspace theme`}
+              onClick={toggleTheme}
+            >
+              {workspaceTheme === "dark" ? (
+                <Sun size={18} />
+              ) : (
+                <Moon size={18} />
+              )}
+            </button>
             <button
               ref={searchRef}
               className="workspace-search-trigger"
@@ -614,7 +630,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           {children}
         </main>
         <footer className="workspace-footer">
-          <span>CampusOS</span>
+          <span>Scholaxys</span>
           <span>Your campus, connected.</span>
           <Link to="/settings">
             Account settings <ArrowUpRight size={12} />
