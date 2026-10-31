@@ -100,9 +100,16 @@ router.post('/:id/rsvp', authMiddleware, (req: Request, res: Response) => {
     const { id } = req.params;
     const db = getDb();
 
-    db.prepare('UPDATE events SET participants_count = participants_count + 1 WHERE id = ?').run(id);
-
-    return res.json({ message: 'RSVP confirmed. Pass dispatched to your CampusOS wallet.' });
+    const event = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
+    if (!event) return res.status(404).json({ error: 'Event not found.' });
+    if (!event.registration_open) return res.status(409).json({ error: 'Registration for this event is closed.' });
+    event.registered_users ||= [];
+    if (event.registered_users.includes(req.user!.id)) return res.json({ message: 'You are already registered for this event.' });
+    if (event.max_capacity && Number(event.participants_count || 0) >= Number(event.max_capacity)) return res.status(409).json({ error: 'This event has reached capacity.' });
+    event.registered_users.push(req.user!.id);
+    event.participants_count = Number(event.participants_count || 0) + 1;
+    db.scheduleSave();
+    return res.json({ message: 'Your event registration is confirmed.' });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to RSVP.' });
   }

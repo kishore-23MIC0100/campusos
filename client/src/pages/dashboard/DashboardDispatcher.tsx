@@ -38,6 +38,6 @@ export const DashboardDispatcher: React.FC = () => {
     case 'STAFF':
       return <div className="campus-dashboard-page"><StaffDashboard /></div>;
     default:
-      return <div className="campus-dashboard-page"><AdminDashboard /></div>;
+      return <Navigate to="/login" replace />;
   }
 };

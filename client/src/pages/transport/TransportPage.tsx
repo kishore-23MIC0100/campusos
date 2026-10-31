@@ -1,12 +1,9 @@
+import { AccessibleDialog } from '../../components/common/AccessibleDialog';
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import {
-  Bus, MapPin, Navigation, Phone, Users, ShieldCheck, Plus, Search,
-  Filter, CheckCircle2, Clock, Play, RotateCcw, AlertTriangle,
-  Compass, ChevronRight, X, UserPlus, Trash2, BatteryCharging, Radio
-} from 'lucide-react';
+import { Bus, MapPin, Navigation, Phone, Users, ShieldCheck, Plus, CheckCircle2, Clock, ChevronRight, X, UserPlus, Trash2, Radio } from 'lucide-react';
 
 export const TransportPage: React.FC = () => {
   const { user } = useAuth();
@@ -15,12 +12,15 @@ export const TransportPage: React.FC = () => {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN';
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [studentOptions, setStudentOptions] = useState<any[]>([]);
   const [overview, setOverview] = useState<any>(null);
   const [routes, setRoutes] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [allocations, setAllocations] = useState<any[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'routes' | 'roster' | 'fleet'>('routes');
 
   // Modals
@@ -29,56 +29,42 @@ export const TransportPage: React.FC = () => {
 
   // New Route Form
   const [routeForm, setRouteForm] = useState({
-    routeNumber: 'Route 05',
-    routeName: 'Central Expressway & Cyber City Corridor',
-    startPoint: 'Brigade Metropolis Gate 1',
-    endPoint: 'Oakridge Main Campus Gate 2',
-    morningStartTime: '06:50 AM',
-    eveningStartTime: '03:35 PM',
-    busNumber: 'KA-01-EQ-5022',
-    driverName: 'Mohammad Rafiq',
-    driverPhone: '+91 98450 11234',
-    attendantName: 'Kavitha S',
-    attendantPhone: '+91 98450 11235',
-    stops: [
-      { stopName: 'Brigade Metropolis Gate 1', morningTime: '06:50 AM', eveningTime: '04:10 PM', landmark: 'Tower A Porch' },
-      { stopName: 'Phoenix Mall Junction', morningTime: '07:05 AM', eveningTime: '03:55 PM', landmark: 'Bus Bay 2' },
-      { stopName: 'Oakridge Main Campus Terminal', morningTime: '07:35 AM', eveningTime: '03:35 PM', landmark: 'Transport Bay E' }
-    ]
+    routeNumber: '', routeName: '', startPoint: '', endPoint: '', morningStartTime: '', eveningStartTime: '',
+    busNumber: '', driverName: '', driverPhone: '', attendantName: '', attendantPhone: '', stops: [] as any[],
   });
 
   // Allocate Student Form
   const [allocForm, setAllocForm] = useState({
-    studentId: 'usr_student_1',
-    studentName: 'Arav Patel',
-    gradeSection: 'Grade 10A',
+    studentId: '',
+    studentName: '',
+    gradeSection: '',
     routeId: '',
     routeName: '',
     stopId: '',
     stopName: '',
-    pickupTime: '07:00 AM',
-    parentPhone: '+91 98765 43210'
+    pickupTime: '',
+    parentPhone: ''
   });
 
   const loadData = async () => {
-    setLoading(true);
+    setLoading(true); setLoadError('');
     try {
-      const [ovRes, rtRes, vhRes, alcRes] = await Promise.all([
+      const [ovRes, rtRes, vhRes, alcRes, studentsRes] = await Promise.all([
         api.getTransportOverview(),
         api.getTransportRoutes({ search: searchQuery.trim() || undefined }),
         api.getTransportVehicles(),
-        api.getTransportAllocations({ search: searchQuery.trim() || undefined })
+        api.getTransportAllocations({ search: searchQuery.trim() || undefined }),
+        isSuperAdmin ? api.getStudents() : Promise.resolve({ students: [] })
       ]);
       setOverview(ovRes);
       setRoutes(rtRes.routes || []);
       setVehicles(vhRes.vehicles || []);
       setAllocations(alcRes.allocations || []);
+      setStudentOptions(studentsRes.students || []);
 
-      if (rtRes.routes && rtRes.routes.length > 0 && !selectedRoute) {
-        setSelectedRoute(rtRes.routes[0]);
-      }
+      setSelectedRoute((previous: any) => (rtRes.routes || []).find((route: any) => route.id === previous?.id) || rtRes.routes?.[0] || null);
     } catch (err: any) {
-      showToast(err.message || 'Failed to load transport details', 'error');
+      setLoadError(err.message || 'Transport details could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -88,22 +74,10 @@ export const TransportPage: React.FC = () => {
     loadData();
   }, []);
 
-  const handleSimulateTransit = async (routeId: string) => {
-    try {
-      const res = await api.simulateTransitProgress(routeId);
-      showToast(`Transit Status Updated: ${res.status}`, 'success');
-      loadData();
-      if (selectedRoute?.id === routeId) {
-        const updated = await api.getRouteDetails(routeId);
-        setSelectedRoute(updated.route);
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Simulation error', 'error');
-    }
-  };
-
   const handleCreateRoute = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const res = await api.createTransportRoute(routeForm);
       showToast('New bus route registered successfully', 'success');
@@ -112,13 +86,16 @@ export const TransportPage: React.FC = () => {
       setSelectedRoute(res.route);
     } catch (err: any) {
       showToast(err.message || 'Failed to create route', 'error');
-    }
+    } finally { setSubmitting(false); }
   };
 
   const handleAllocateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const targetRoute = routes.find(r => r.id === allocForm.routeId) || routes[0];
+      if (!targetRoute || !studentOptions.some(student => student.id === allocForm.studentId)) throw new Error('Select a registered student and a campus route.');
       const payload = {
         ...allocForm,
         routeId: targetRoute?.id,
@@ -130,7 +107,7 @@ export const TransportPage: React.FC = () => {
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Failed to allocate student', 'error');
-    }
+    } finally { setSubmitting(false); }
   };
 
   const handleRemoveAllocation = async (id: string) => {
@@ -144,6 +121,8 @@ export const TransportPage: React.FC = () => {
     }
   };
 
+  if (loading) return <div role="status" className="space-y-5"><div className="h-32 animate-pulse rounded-2xl bg-slate-200/50" /><div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{[0, 1, 2, 3].map(item => <div key={item} className="h-28 animate-pulse rounded-2xl bg-slate-200/50" />)}</div><p className="text-sm text-slate-500">Loading campus transport records...</p></div>;
+  if (loadError) return <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-rose-800"><h1 className="text-lg font-semibold">Transport records unavailable</h1><p className="mt-2 text-sm">{loadError}</p><button onClick={loadData} className="mt-5 rounded-xl border border-rose-300 px-4 py-2 text-sm">Try again</button></div>;
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
       {/* Header Banner */}
@@ -159,7 +138,7 @@ export const TransportPage: React.FC = () => {
               Transportation & Fleet Management
             </h1>
             <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-2xl font-medium">
-              Real-time GPS bus tracking, route stop schedules, passenger rosters, driver compliance, and live commute safety oversight.
+              Manage recorded routes, stop schedules, vehicle information and student transport assignments.
             </p>
           </div>
 
@@ -192,11 +171,11 @@ export const TransportPage: React.FC = () => {
           <div>
             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Active Bus Routes</div>
             <div className="text-2xl font-black text-navy-900 mt-1">
-              {overview?.totalRoutes || routes.length}
+              {overview?.totalRoutes ?? routes.length}
             </div>
             <div className="text-xs text-amber-600 font-bold flex items-center gap-1 mt-1">
               <Radio className="w-3.5 h-3.5 animate-pulse" />
-              {overview?.activeRoutes || 2} In Transit Right Now
+              {overview?.activeRoutes ?? 0} recorded active routes
             </div>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
@@ -206,12 +185,12 @@ export const TransportPage: React.FC = () => {
 
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">GPS Online Fleet</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Recorded GPS Status</div>
             <div className="text-2xl font-black text-emerald-600 mt-1">
-              {overview?.gpsActiveVehicles || vehicles.length} / {vehicles.length}
+              {overview?.gpsActiveVehicles ?? 0} / {vehicles.length}
             </div>
             <div className="text-xs text-emerald-600 font-bold flex items-center gap-1 mt-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> 100% Telemetry Active
+              <CheckCircle2 className="w-3.5 h-3.5" /> Status recorded by the school
             </div>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
@@ -223,10 +202,10 @@ export const TransportPage: React.FC = () => {
           <div>
             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Enrolled Student Commuters</div>
             <div className="text-2xl font-black text-navy-900 mt-1">
-              {overview?.totalStudentsAllocated || allocations.length}
+              {overview?.totalStudentsAllocated ?? allocations.length}
             </div>
             <div className="text-xs text-teal-600 font-bold mt-1">
-              {overview?.utilizationRate || 68}% Bus Capacity Utilized
+              {overview?.utilizationRate ?? 0}% Bus Capacity Utilized
             </div>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
@@ -238,10 +217,10 @@ export const TransportPage: React.FC = () => {
           <div>
             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Fleet Seating</div>
             <div className="text-2xl font-black text-slate-800 mt-1">
-              {overview?.totalFleetCapacity || 159} Seats
+              {overview?.totalFleetCapacity ?? 0} Seats
             </div>
             <div className="text-xs text-slate-500 font-medium mt-1">
-              4 Certified Safety Coaches
+              {vehicles.length} vehicles on record
             </div>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -251,7 +230,7 @@ export const TransportPage: React.FC = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 pb-2">
         <button
           type="button"
           onClick={() => setActiveTab('routes')}
@@ -340,7 +319,7 @@ export const TransportPage: React.FC = () => {
                   <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                     <span className="font-mono text-slate-700 font-bold">{r.bus_number}</span>
                     <span className="text-amber-700 font-bold flex items-center gap-1">
-                      {r.stopsCount || 4} Stops • {r.studentCount || 0} Students
+                      {r.stopsCount ?? 0} Stops • {r.studentCount || 0} Students
                       <ChevronRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
@@ -366,15 +345,7 @@ export const TransportPage: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* Simulator Trigger */}
-                  <button
-                    type="button"
-                    onClick={() => handleSimulateTransit(selectedRoute.id)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-sm transition-all cursor-pointer"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                    Simulate Transit Step ({selectedRoute.status})
-                  </button>
+
                 </div>
 
                 {/* Driver & Attendant Card */}
@@ -399,10 +370,10 @@ export const TransportPage: React.FC = () => {
                     </div>
                     <div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase">Bus Attendant</div>
-                      <div className="font-extrabold text-slate-900">{selectedRoute.attendant_name || 'Assigned Staff'}</div>
+                      <div className="font-extrabold text-slate-900">{selectedRoute.attendant_name || 'Not assigned'}</div>
                       <a href={`tel:${selectedRoute.attendant_phone}`} className="text-teal-700 font-bold flex items-center gap-1 mt-0.5">
                         <Phone className="w-3 h-3" />
-                        {selectedRoute.attendant_phone || '+91 98450 99882'}
+                        {selectedRoute.attendant_phone || 'Not provided'}
                       </a>
                     </div>
                   </div>
@@ -413,6 +384,7 @@ export const TransportPage: React.FC = () => {
                   <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-4">
                     Scheduled Route Stops & ETA Timeline
                   </h4>
+                  {!selectedRoute.stops?.length && <p className="mb-3 text-xs text-slate-500">No route stops recorded.</p>}
                   <div className="space-y-4 relative pl-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200">
                     {(selectedRoute.stops || []).map((st: any, idx: number) => {
                       const isFirst = idx === 0;
@@ -440,7 +412,7 @@ export const TransportPage: React.FC = () => {
               </div>
             ) : (
               <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 text-slate-400">
-                Select a route from the list to view its stop sequence and live transit status.
+                Select a route from the list to view its stop sequence and recorded route information.
               </div>
             )}
           </div>
@@ -479,6 +451,7 @@ export const TransportPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
+                {!allocations.length && <tr><td colSpan={7} className="p-10 text-center text-slate-500">No transport allocations recorded.</td></tr>}
                 {allocations.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50/80">
                     <td className="py-3.5 px-4 font-extrabold text-slate-900">{a.student_name}</td>
@@ -519,6 +492,7 @@ export const TransportPage: React.FC = () => {
       {/* TAB 3: VEHICLE FLEET */}
       {activeTab === 'fleet' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {!vehicles.length && <p className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">No vehicles recorded.</p>}
           {vehicles.map((v) => (
             <div key={v.id} className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm flex flex-col justify-between">
               <div>
@@ -547,17 +521,17 @@ export const TransportPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] font-bold uppercase">Speed Governor</span>
-                    <div className="font-semibold text-slate-800 mt-0.5">{v.speed_limit_kmh || 40} km/h Cap</div>
+                    <div className="font-semibold text-slate-800 mt-0.5">{v.speed_limit_kmh ? `${v.speed_limit_kmh} km/h` : 'Not recorded'}</div>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] font-bold uppercase">Fitness Validity</span>
-                    <div className="font-semibold text-slate-800 mt-0.5">{v.fitness_expiry || '2027-08-30'}</div>
+                    <div className="font-semibold text-slate-800 mt-0.5">{v.fitness_expiry || 'Not recorded'}</div>
                   </div>
                 </div>
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 font-medium">
-                Assigned Route: <strong className="text-slate-800">{v.assigned_route || 'North Sector Express'}</strong>
+                Assigned Route: <strong className="text-slate-800">{v.assigned_route || 'Not assigned'}</strong>
               </div>
             </div>
           ))}
@@ -566,8 +540,7 @@ export const TransportPage: React.FC = () => {
 
       {/* MODAL: ALLOCATE STUDENT */}
       {showAllocateModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-scaleIn">
+        <AccessibleDialog title="Assign student to transport" onClose={() => setShowAllocateModal(false)} busy={submitting} className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-scaleIn">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2 text-navy-900 font-extrabold text-base">
                 <UserPlus className="w-5 h-5 text-amber-600" />
@@ -576,6 +549,8 @@ export const TransportPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowAllocateModal(false)}
+                aria-label="Close dialog"
+                disabled={submitting}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
@@ -584,20 +559,14 @@ export const TransportPage: React.FC = () => {
 
             <form onSubmit={handleAllocateStudent} className="py-4 space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Student Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={allocForm.studentName}
-                  onChange={(e) => setAllocForm({ ...allocForm, studentName: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800"
-                />
+                <label htmlFor="transport-field-1" className="block font-bold text-slate-700 mb-1">Registered student</label>
+                <select id="transport-field-1" required aria-label="Registered student" value={allocForm.studentId} onChange={event => { const student = studentOptions.find(item => item.id === event.target.value); if (student) setAllocForm({ ...allocForm, studentId: student.id, studentName: `${student.first_name} ${student.last_name}`, gradeSection: `${student.grade} ${student.section}`, parentPhone: student.parent_phone || '' }); }} className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800"><option value="" disabled>Select a student</option>{studentOptions.map(student => <option key={student.id} value={student.id}>{student.first_name} {student.last_name} ({student.student_id})</option>)}</select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Grade & Section</label>
-                  <input
+                  <label htmlFor="transport-field-2" className="block font-bold text-slate-700 mb-1">Grade & Section</label>
+                  <input id="transport-field-2"
                     type="text"
                     value={allocForm.gradeSection}
                     onChange={(e) => setAllocForm({ ...allocForm, gradeSection: e.target.value })}
@@ -605,8 +574,8 @@ export const TransportPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Pickup Time</label>
-                  <input
+                  <label htmlFor="transport-field-3" className="block font-bold text-slate-700 mb-1">Pickup Time</label>
+                  <input id="transport-field-3"
                     type="text"
                     value={allocForm.pickupTime}
                     onChange={(e) => setAllocForm({ ...allocForm, pickupTime: e.target.value })}
@@ -616,8 +585,8 @@ export const TransportPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Assign Bus Route</label>
-                <select
+                <label htmlFor="transport-field-4" className="block font-bold text-slate-700 mb-1">Assign Bus Route</label>
+                <select id="transport-field-4"
                   value={allocForm.routeId || (routes[0]?.id || '')}
                   onChange={(e) => setAllocForm({ ...allocForm, routeId: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-bold text-slate-800"
@@ -629,8 +598,8 @@ export const TransportPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Designated Stop Name</label>
-                <input
+                <label htmlFor="transport-field-5" className="block font-bold text-slate-700 mb-1">Designated Stop Name</label>
+                <input id="transport-field-5"
                   type="text"
                   required
                   value={allocForm.stopName}
@@ -641,8 +610,8 @@ export const TransportPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Parent Contact Phone</label>
-                <input
+                <label htmlFor="transport-field-6" className="block font-bold text-slate-700 mb-1">Parent Contact Phone</label>
+                <input id="transport-field-6"
                   type="text"
                   value={allocForm.parentPhone}
                   onChange={(e) => setAllocForm({ ...allocForm, parentPhone: e.target.value })}
@@ -660,20 +629,19 @@ export const TransportPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md"
                 >
-                  Confirm Allocation
+                  {submitting ? 'Saving allocation...' : 'Confirm allocation'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </AccessibleDialog>
       )}
 
       {/* MODAL: CREATE ROUTE */}
       {showAddRouteModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-scaleIn my-8">
+        <AccessibleDialog title="Create bus route" onClose={() => setShowAddRouteModal(false)} busy={submitting} className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-scaleIn my-8">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="text-base font-extrabold text-navy-900">
                 Create New Campus Bus Route
@@ -681,6 +649,8 @@ export const TransportPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowAddRouteModal(false)}
+                aria-label="Close dialog"
+                disabled={submitting}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
@@ -690,8 +660,8 @@ export const TransportPage: React.FC = () => {
             <form onSubmit={handleCreateRoute} className="py-4 space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Route Identifier</label>
-                  <input
+                  <label htmlFor="transport-field-7" className="block font-bold text-slate-700 mb-1">Route Identifier</label>
+                  <input id="transport-field-7"
                     type="text"
                     required
                     value={routeForm.routeNumber}
@@ -700,9 +670,10 @@ export const TransportPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Assigned Coach</label>
-                  <input
+                  <label htmlFor="transport-field-8" className="block font-bold text-slate-700 mb-1">Assigned Coach</label>
+                  <input id="transport-field-8"
                     type="text"
+                    required
                     value={routeForm.busNumber}
                     onChange={(e) => setRouteForm({ ...routeForm, busNumber: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono font-bold text-slate-800"
@@ -711,8 +682,8 @@ export const TransportPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Route Title / Neighborhood Description</label>
-                <input
+                <label htmlFor="transport-field-9" className="block font-bold text-slate-700 mb-1">Route Title / Neighborhood Description</label>
+                <input id="transport-field-9"
                   type="text"
                   required
                   value={routeForm.routeName}
@@ -723,8 +694,9 @@ export const TransportPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Origin Point</label>
-                  <input
+                  <label htmlFor="transport-field-10" className="block font-bold text-slate-700 mb-1">Origin Point</label>
+                  <input id="transport-field-10"
+                    required
                     type="text"
                     value={routeForm.startPoint}
                     onChange={(e) => setRouteForm({ ...routeForm, startPoint: e.target.value })}
@@ -732,9 +704,10 @@ export const TransportPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Morning Start Time</label>
-                  <input
+                  <label htmlFor="transport-field-11" className="block font-bold text-slate-700 mb-1">Morning Start Time</label>
+                  <input id="transport-field-11"
                     type="text"
+                    required
                     value={routeForm.morningStartTime}
                     onChange={(e) => setRouteForm({ ...routeForm, morningStartTime: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800"
@@ -744,18 +717,20 @@ export const TransportPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Driver Full Name</label>
-                  <input
+                  <label htmlFor="transport-field-12" className="block font-bold text-slate-700 mb-1">Driver Full Name</label>
+                  <input id="transport-field-12"
                     type="text"
+                    required
                     value={routeForm.driverName}
                     onChange={(e) => setRouteForm({ ...routeForm, driverName: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Driver Contact</label>
-                  <input
+                  <label htmlFor="transport-field-13" className="block font-bold text-slate-700 mb-1">Driver Contact</label>
+                  <input id="transport-field-13"
                     type="text"
+                    required
                     value={routeForm.driverPhone}
                     onChange={(e) => setRouteForm({ ...routeForm, driverPhone: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800"
@@ -763,6 +738,8 @@ export const TransportPage: React.FC = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3"><label className="block font-bold text-slate-700">Destination<input required value={routeForm.endPoint} onChange={event => setRouteForm({ ...routeForm, endPoint: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" /></label><label className="block font-bold text-slate-700">Evening start time<input required type="time" value={routeForm.eveningStartTime} onChange={event => setRouteForm({ ...routeForm, eveningStartTime: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" /></label></div>
+              <p className="text-slate-500">Route stops can be added to the route record by the transport administrator.</p>
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
@@ -773,14 +750,14 @@ export const TransportPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md"
                 >
-                  Publish Bus Route
+                  {submitting ? 'Saving route...' : 'Save bus route'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </AccessibleDialog>
       )}
     </div>
   );

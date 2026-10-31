@@ -1,9 +1,8 @@
+import { AccessibleDialog } from '../../components/common/AccessibleDialog';
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import {
-  Sparkles, Award, Trophy, Plus, Search, Quote, Calendar, User, X
-} from 'lucide-react';
+import { Sparkles, Plus, Quote, X } from 'lucide-react';
 
 export const SpotlightPage: React.FC = () => {
   const { user } = useAuth();
@@ -15,10 +14,10 @@ export const SpotlightPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [badgeLabel, setBadgeLabel] = useState('STUDENT OF THE MONTH');
   const [recipientName, setRecipientName] = useState('');
-  const [recipientRole, setRecipientRole] = useState('Student Council STEM Lead');
-  const [category, setCategory] = useState('STUDENT_ACHIEVEMENT');
+  const [recipientRole, setRecipientRole] = useState('');
+  const category = 'STUDENT_ACHIEVEMENT';
   const [story, setStory] = useState('');
-  const [metricsHighlight, setMetricsHighlight] = useState('1st Rank Nationally');
+  const [metricsHighlight, setMetricsHighlight] = useState('');
   const [citationQuote, setCitationQuote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -70,6 +69,7 @@ export const SpotlightPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {loading && <p role="status" className="rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-600">Loading campus records...</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
@@ -149,11 +149,12 @@ export const SpotlightPage: React.FC = () => {
 
       {/* MODAL: Curate Spotlight */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-navy-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-scaleIn">
+        <AccessibleDialog title="Create campus spotlight" onClose={() => setShowCreateModal(false)} busy={submitting} className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-scaleIn">
             <button
               type="button"
               onClick={() => setShowCreateModal(false)}
+              aria-label="Close dialog"
+              disabled={submitting}
               className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700"
             >
               <X className="w-5 h-5" />
@@ -164,8 +165,8 @@ export const SpotlightPage: React.FC = () => {
 
             <form onSubmit={handleCreateSpotlight} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Feature Headline *</label>
-                <input
+                <label htmlFor="spotlightpage-field-1" className="block text-xs font-semibold text-slate-700 mb-1">Feature Headline *</label>
+                <input id="spotlightpage-field-1"
                   type="text"
                   required
                   value={title}
@@ -177,8 +178,8 @@ export const SpotlightPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Recipient Name *</label>
-                  <input
+                  <label htmlFor="spotlightpage-field-2" className="block text-xs font-semibold text-slate-700 mb-1">Recipient Name *</label>
+                  <input id="spotlightpage-field-2"
                     type="text"
                     required
                     value={recipientName}
@@ -189,8 +190,8 @@ export const SpotlightPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Badge Title</label>
-                  <input
+                  <label htmlFor="spotlightpage-field-3" className="block text-xs font-semibold text-slate-700 mb-1">Badge Title</label>
+                  <input id="spotlightpage-field-3"
                     type="text"
                     value={badgeLabel}
                     onChange={(e) => setBadgeLabel(e.target.value)}
@@ -200,9 +201,10 @@ export const SpotlightPage: React.FC = () => {
                 </div>
               </div>
 
+              <label className="block text-xs font-semibold text-slate-700">Recipient role or class<input value={recipientRole} onChange={event => setRecipientRole(event.target.value)} className="glass-input mt-1 w-full rounded-xl px-3 py-2" /></label>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Story & Citation *</label>
-                <textarea
+                <label htmlFor="spotlightpage-field-4" className="block text-xs font-semibold text-slate-700 mb-1">Story & Citation *</label>
+                <textarea id="spotlightpage-field-4"
                   required
                   rows={3}
                   value={story}
@@ -214,8 +216,8 @@ export const SpotlightPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Key Metrics Highlight</label>
-                  <input
+                  <label htmlFor="spotlightpage-field-5" className="block text-xs font-semibold text-slate-700 mb-1">Key Metrics Highlight</label>
+                  <input id="spotlightpage-field-5"
                     type="text"
                     value={metricsHighlight}
                     onChange={(e) => setMetricsHighlight(e.target.value)}
@@ -225,8 +227,8 @@ export const SpotlightPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Recipient Quote</label>
-                  <input
+                  <label htmlFor="spotlightpage-field-6" className="block text-xs font-semibold text-slate-700 mb-1">Recipient Quote</label>
+                  <input id="spotlightpage-field-6"
                     type="text"
                     value={citationQuote}
                     onChange={(e) => setCitationQuote(e.target.value)}
@@ -244,8 +246,7 @@ export const SpotlightPage: React.FC = () => {
                 {submitting ? 'Publishing...' : 'Publish Spotlight Story'}
               </button>
             </form>
-          </div>
-        </div>
+        </AccessibleDialog>
       )}
     </div>
   );

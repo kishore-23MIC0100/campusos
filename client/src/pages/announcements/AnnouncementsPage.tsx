@@ -1,9 +1,8 @@
+import { AccessibleDialog } from '../../components/common/AccessibleDialog';
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import {
-  Megaphone, Plus, Search, Pin, Calendar, User, CheckCircle2, X
-} from 'lucide-react';
+import { Megaphone, Plus, Search, Pin, Calendar, User, X } from 'lucide-react';
 
 export const AnnouncementsPage: React.FC = () => {
   const { user } = useAuth();
@@ -16,7 +15,7 @@ export const AnnouncementsPage: React.FC = () => {
   // New announcement form
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
-  const [newCategory, setNewCategory] = useState('ACADEMIC');
+  const newCategory = 'ACADEMIC';
   const [newPriority, setNewPriority] = useState('NORMAL');
   const [newAudience, setNewAudience] = useState('ALL');
   const [isPinned, setIsPinned] = useState(false);
@@ -67,6 +66,7 @@ export const AnnouncementsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {loading && <p role="status" className="rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-600">Loading campus records...</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
@@ -155,7 +155,7 @@ export const AnnouncementsPage: React.FC = () => {
 
               <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>{anc.publish_date?.split('T')[0] || '2026-09-08'}</span>
+                <span>{anc.publish_date?.split('T')[0] || 'Not dated'}</span>
               </div>
             </div>
 
@@ -177,11 +177,12 @@ export const AnnouncementsPage: React.FC = () => {
 
       {/* MODAL: Broadcast Circular */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-navy-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-scaleIn">
+        <AccessibleDialog title="Publish announcement" onClose={() => setShowCreateModal(false)} busy={submitting} className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-scaleIn">
             <button
               type="button"
               onClick={() => setShowCreateModal(false)}
+              aria-label="Close dialog"
+              disabled={submitting}
               className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700"
             >
               <X className="w-5 h-5" />
@@ -192,8 +193,8 @@ export const AnnouncementsPage: React.FC = () => {
 
             <form onSubmit={handleCreateAnnouncement} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Circular Title *</label>
-                <input
+                <label htmlFor="announcementspage-field-1" className="block text-xs font-semibold text-slate-700 mb-1">Circular Title *</label>
+                <input id="announcementspage-field-1"
                   type="text"
                   required
                   value={newTitle}
@@ -205,8 +206,8 @@ export const AnnouncementsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Priority</label>
-                  <select
+                  <label htmlFor="announcementspage-field-2" className="block text-xs font-semibold text-slate-700 mb-1">Priority</label>
+                  <select id="announcementspage-field-2"
                     value={newPriority}
                     onChange={(e) => setNewPriority(e.target.value)}
                     className="glass-input w-full px-3 py-2 text-xs rounded-xl bg-white"
@@ -218,8 +219,8 @@ export const AnnouncementsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Target Audience</label>
-                  <select
+                  <label htmlFor="announcementspage-field-3" className="block text-xs font-semibold text-slate-700 mb-1">Target Audience</label>
+                  <select id="announcementspage-field-3"
                     value={newAudience}
                     onChange={(e) => setNewAudience(e.target.value)}
                     className="glass-input w-full px-3 py-2 text-xs rounded-xl bg-white"
@@ -233,8 +234,8 @@ export const AnnouncementsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Detailed Content *</label>
-                <textarea
+                <label htmlFor="announcementspage-field-4" className="block text-xs font-semibold text-slate-700 mb-1">Detailed Content *</label>
+                <textarea id="announcementspage-field-4"
                   required
                   rows={4}
                   value={newContent}
@@ -262,8 +263,7 @@ export const AnnouncementsPage: React.FC = () => {
                 {submitting ? 'Broadcasting...' : 'Publish Announcement'}
               </button>
             </form>
-          </div>
-        </div>
+        </AccessibleDialog>
       )}
     </div>
   );

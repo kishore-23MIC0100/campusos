@@ -11,8 +11,8 @@ router.get('/summary', authMiddleware, (req, res) => {
     const payrolls = db.prepare('SELECT * FROM payrolls').all() as any[];
     const staff = db.prepare('SELECT * FROM staff_details').all() as any[];
 
-    const currentYear = 2026;
-    const currentMonth = 'October';
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: process.env.SCHOOL_TIMEZONE || 'Asia/Kolkata' }).format(new Date());
 
     const currentPayrolls = payrolls.filter(
       p => String(p.month).toLowerCase() === currentMonth.toLowerCase() && Number(p.year) === currentYear

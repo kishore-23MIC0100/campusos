@@ -3,6 +3,11 @@ import { getDb } from '../db.js';
 import { authMiddleware, logAudit } from '../middleware/auth.js';
 
 const router = Router();
+function canReadAnnouncement(announcement: any, req: Request) {
+  if (['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user?.role || '')) return true;
+  const audience = String(announcement.target_audience || 'ALL').toUpperCase();
+  return audience === 'ALL' || audience === 'PUBLIC' || (req.user && [req.user.role, `${req.user.role}S`].includes(audience));
+}
 
 // Get announcements with audience filtering
 router.get('/', (req: Request, res: Response) => {
@@ -33,7 +38,7 @@ router.get('/', (req: Request, res: Response) => {
 
     query += ' ORDER BY is_pinned DESC, publish_date DESC';
 
-    const announcements = db.prepare(query).all(...params);
+    const announcements = db.prepare(query).all(...params).filter(announcement => canReadAnnouncement(announcement, req));
     return res.json({ announcements });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to fetch announcements.' });
@@ -46,7 +51,7 @@ router.get('/:id', (req: Request, res: Response) => {
     const { id } = req.params;
     const db = getDb();
     const announcement = db.prepare('SELECT * FROM announcements WHERE id = ?').get(id);
-    if (!announcement) {
+    if (!announcement || !canReadAnnouncement(announcement, req)) {
       return res.status(404).json({ error: 'Announcement not found.' });
     }
     return res.json({ announcement });

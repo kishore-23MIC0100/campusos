@@ -7,48 +7,37 @@ const router = Router();
 
 export function getTeacherAllotments(userId: string, db: any) {
   try {
-    const teacher = db.prepare('SELECT * FROM teachers WHERE user_id = ? OR email IN (SELECT email FROM users WHERE id = ?)').get(userId, userId) as any;
-    if (!teacher) {
-      return {
-        allottedClasses: [
-          { grade: 'Grade 10', section: 'A' },
-          { grade: 'Grade 11', section: 'A' },
-          { grade: 'Grade 12', section: 'A' },
-        ],
-        allottedSubjects: ['Mathematics', 'Computing'],
-        department: 'Mathematics',
-        employeeId: 'EMP-TCH-101',
-      };
-    }
+    const teacher = (db.prepare('SELECT * FROM teachers').all() as any[]).find(teacher => teacher.user_id === userId);
+    if (!teacher) return { allottedClasses: [], allottedSubjects: [], department: null, employeeId: null };
 
     // Parse classes_handled e.g. "Grade 10A, Grade 11A, Grade 12A"
-    const rawClasses = (teacher.classes_handled || 'Grade 10A').split(',').map((c: string) => c.trim());
+    const rawClasses = (teacher.classes_handled || '').split(',').map((c: string) => c.trim()).filter(Boolean);
     const allottedClasses = rawClasses.map((rc: string) => {
       const match = rc.match(/(Grade\s*\d+)\s*([A-Z])/i);
       if (match) {
         return { grade: match[1], section: match[2].toUpperCase() };
       }
-      return { grade: 'Grade 10', section: 'A' };
-    });
+      return null;
+    }).filter(Boolean);
 
     // Parse subjects
-    const rawSubjects = (teacher.subjects || teacher.department || 'General')
+    const rawSubjects = (teacher.subjects || '')
       .split(',')
       .map((s: string) => s.trim())
       .filter(Boolean);
 
     return {
       allottedClasses,
-      allottedSubjects: rawSubjects.length > 0 ? rawSubjects : [teacher.department],
+      allottedSubjects: rawSubjects,
       department: teacher.department,
       employeeId: teacher.employee_id,
     };
   } catch (err) {
     return {
-      allottedClasses: [{ grade: 'Grade 10', section: 'A' }],
-      allottedSubjects: ['General Studies'],
-      department: 'Academics',
-      employeeId: 'EMP-001',
+      allottedClasses: [],
+      allottedSubjects: [],
+      department: null,
+      employeeId: null,
     };
   }
 }
@@ -58,10 +47,11 @@ router.post('/login', async (req: Request, res: Response) => {
   try {
     const { identifier, password, expectedRole } = req.body;
 
-    if (!identifier || !password) {
+    if (typeof identifier !== 'string' || typeof password !== 'string' || !identifier.trim() || !password || identifier.length > 254 || password.length > 128) {
       return res.status(400).json({ error: 'Please enter your login identifier and password.' });
     }
 
+    if ((process.env.NODE_ENV === 'production' || process.env.VERCEL) && ['Admin@2026', 'Teacher@2026', 'Student@2026', 'Parent@2026', 'Pending@2026', 'StaffDemo!2026'].includes(password)) return res.status(401).json({ error: 'Development credentials cannot be used in production. Contact your campus administrator for a secure account.' });
     const db = getDb();
     const cleanId = identifier.trim().toLowerCase();
 
@@ -94,14 +84,8 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid login credentials. Please verify your ID and try again.' });
     }
 
-    // Auto-enable and approve valid user accounts
     if (user.status !== 'APPROVED') {
-      user.status = 'APPROVED';
-      try {
-        db.prepare('UPDATE users SET status = ? WHERE id = ?').run('APPROVED', user.id);
-      } catch (e) {
-        console.warn('Auto-approval update notice:', e);
-      }
+      return res.status(403).json({ error: user.status === 'PENDING' ? 'Your access request is awaiting administrator approval.' : 'This account is not active. Contact your campus administrator.', status: user.status });
     }
 
     // Check expected role alignment warning/guidance if user opened a specific portal
@@ -149,13 +133,15 @@ router.post('/register', async (req: Request, res: Response) => {
   try {
     const { fullName, email, username, password, role, phone, department, gradeSection, studentId, notes } = req.body;
 
-    if (!fullName || !email || !password || !role) {
+    if (![fullName, email, password, role].every(value => typeof value === 'string' && value.trim())) {
       return res.status(400).json({ error: 'Full name, email, password, and requested role are required.' });
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || fullName.length > 120 || password.length < 12 || password.length > 128) return res.status(400).json({ error: 'Use a valid email, a name under 120 characters, and a password between 12 and 128 characters.' });
+    if (username !== undefined && (typeof username !== 'string' || !/^[a-zA-Z0-9._-]{3,80}$/.test(username))) return res.status(400).json({ error: 'Username must be 3 to 80 letters, digits, dots, hyphens or underscores.' });
     const db = getDb();
     const cleanEmail = email.trim().toLowerCase();
-    const allowedRoles = ['TEACHER', 'STAFF', 'STUDENT', 'PARENT', 'SCHOOL_ADMIN'];
+    const allowedRoles = ['TEACHER', 'STAFF', 'STUDENT', 'PARENT'];
     if (!allowedRoles.includes(String(role).toUpperCase())) return res.status(400).json({ error: 'Choose a supported portal role.' });
     const cleanUsername = (username || email.split('@')[0]).trim().toLowerCase();
 
@@ -227,6 +213,19 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
+// Change the authenticated user's password and revoke older sessions.
+router.post('/change-password', authMiddleware, async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body;
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || currentPassword.length > 128 || newPassword.length < 12 || newPassword.length > 128) return res.status(400).json({ error: 'Enter your current password and a new password between 12 and 128 characters.' });
+  if (currentPassword === newPassword) return res.status(400).json({ error: 'Choose a different password.' });
+  const db = getDb(); const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user!.id);
+  if (!user || !await bcrypt.compare(currentPassword, user.password_hash)) return res.status(400).json({ error: 'Your current password is incorrect.' });
+  const hash = await bcrypt.hash(newPassword, 12);
+  db.prepare('UPDATE users SET password_hash = ?, token_version = ? WHERE id = ?').run(hash, Number(user.token_version || 0) + 1, user.id);
+  logAudit(user.id, user.full_name, user.role, 'PASSWORD_CHANGED', 'AUTH', user.id, 'Password changed and earlier sessions revoked.');
+  return res.json({ message: 'Your password has been changed. Earlier sessions have been signed out.', token: generateToken(user) });
+});
+
 // Current user profile
 router.get('/me', authMiddleware, (req: Request, res: Response) => {
   try {
@@ -265,7 +264,7 @@ router.get('/me', authMiddleware, (req: Request, res: Response) => {
 // Reset password request
 router.post('/reset-password', (req: Request, res: Response) => {
   const { identifier } = req.body;
-  if (!identifier) {
+  if (typeof identifier !== 'string' || !identifier.trim() || identifier.length > 254) {
     return res.status(400).json({ error: 'Please enter your registered email or username.' });
   }
 
@@ -279,7 +278,7 @@ router.post('/reset-password', (req: Request, res: Response) => {
 
   // Always return friendly response to avoid email enumeration
   return res.json({
-    message: 'If a matching account exists, password recovery instructions and a secure reset token have been dispatched to your registered institutional contact.',
+    message: 'For password recovery, contact your campus administrator. Your request has been recorded for review.',
   });
 });
 

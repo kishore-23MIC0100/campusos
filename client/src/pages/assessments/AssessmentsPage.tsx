@@ -199,7 +199,7 @@ export const AssessmentsPage: React.FC = () => {
     if (!files?.length) return;
     const selected = Array.from(files);
     const currentSize = createForm.attachments.reduce((total: number, file: any) => total + Number(file.size || 0), 0);
-    if (selected.some(file => file.size > 5 * 1024 * 1024) || currentSize + selected.reduce((total, file) => total + file.size, 0) > 5 * 1024 * 1024) { showToast('All reference files together must stay within 5 MB.', 'error'); return; }
+    if (selected.some(file => file.size > 2 * 1024 * 1024) || currentSize + selected.reduce((total, file) => total + file.size, 0) > 2 * 1024 * 1024) { showToast('All reference files together must stay within 2 MB.', 'error'); return; }
     try {
       const attachments = await Promise.all(selected.map(async file => ({ name: file.name, type: file.type || 'application/octet-stream', size: file.size, data: await fileToDataUrl(file) })));
       setCreateForm(prev => ({ ...prev, attachments: [...prev.attachments, ...attachments] }));
@@ -807,7 +807,7 @@ export const AssessmentsPage: React.FC = () => {
                     <h3 className="text-sm font-extrabold text-slate-900">Reference files students can view</h3>
                     <p className="mt-1 text-[11px] leading-relaxed text-slate-500">Attach instructions, readings, or templates for this class.</p>
                   </div>
-                  <div className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-extrabold text-teal-800">{createForm.attachments.length} {createForm.attachments.length === 1 ? 'file' : 'files'} · 5 MB max</div>
+                  <div className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-extrabold text-teal-800">{createForm.attachments.length} {createForm.attachments.length === 1 ? 'file' : 'files'} · 2 MB max</div>
                 </div>
 
                 <label
@@ -819,7 +819,7 @@ export const AssessmentsPage: React.FC = () => {
                   <input type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.txt" onChange={e => { handleAssessmentAttachments(e.target.files); e.currentTarget.value = ''; }} className="sr-only" />
                   <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-teal-700 shadow-sm transition group-hover:-translate-y-0.5 group-hover:shadow"><UploadCloud className="h-5 w-5" /></span>
                   <span className="text-xs font-bold text-slate-800">Drop files here or <span className="text-teal-700 underline decoration-teal-300 underline-offset-2">browse files</span></span>
-                  <span className="mt-1.5 text-[10px] text-slate-500">PDF, DOC/DOCX, PPT/PPTX, JPG/PNG, TXT · 5 MB combined</span>
+                  <span className="mt-1.5 text-[10px] text-slate-500">PDF, DOC/DOCX, PPT/PPTX, JPG/PNG, TXT · 2 MB combined</span>
                 </label>
 
                 {createForm.attachments.length > 0 ? (

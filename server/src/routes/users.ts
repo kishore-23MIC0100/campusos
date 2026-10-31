@@ -49,6 +49,8 @@ router.put('/:id/approve', authMiddleware, requireRoles('SUPER_ADMIN', 'SCHOOL_A
       return res.status(404).json({ error: 'User not found.' });
     }
 
+    if (user.role === 'SUPER_ADMIN' && req.user!.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Only an executive administrator can approve this role.' });
+    if (user.status !== 'PENDING') return res.status(409).json({ error: 'Only pending access requests can be approved.' });
     db.prepare('UPDATE users SET status = "APPROVED", updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
 
     // If student, create student directory record if doesn't exist
@@ -58,10 +60,11 @@ router.put('/:id/approve', authMiddleware, requireRoles('SUPER_ADMIN', 'SCHOOL_A
         const parts = (user.full_name || 'Student User').split(' ');
         const stuId = user.student_id || `STU-${Date.now().toString().slice(-4)}`;
         const admNo = user.admission_no || `ADM-${Date.now().toString().slice(-4)}`;
+        const gradeMatch = String(user.grade_section || '').match(/^(Grade\s*\d+)\s*([A-Za-z])$/i);
         db.prepare(`
           INSERT INTO students (id, user_id, student_id, admission_no, first_name, last_name, grade, section, status)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(`stu_${Date.now()}`, id, stuId, admNo, parts[0], parts.slice(1).join(' ') || 'Student', 'Grade 10', 'A', 'ACTIVE');
+        `).run(`stu_${Date.now()}`, id, stuId, admNo, parts[0], parts.slice(1).join(' ') || '', gradeMatch?.[1] || '', gradeMatch?.[2]?.toUpperCase() || '', 'ACTIVE');
       }
     }
 
@@ -74,7 +77,7 @@ router.put('/:id/approve', authMiddleware, requireRoles('SUPER_ADMIN', 'SCHOOL_A
         db.prepare(`
           INSERT INTO teachers (id, user_id, employee_id, first_name, last_name, designation, department, email, phone, status)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(`tch_${Date.now()}`, id, empId, parts[0], parts.slice(1).join(' ') || 'Faculty', 'Instructor', user.department || 'General Academics', user.email, user.phone || '+91 98000 00000', 'ACTIVE');
+        `).run(`tch_${Date.now()}`, id, empId, parts[0], parts.slice(1).join(' ') || 'Faculty', 'Instructor', user.department || 'General Academics', user.email, user.phone || null, 'ACTIVE');
       }
     }
 
@@ -107,6 +110,9 @@ router.put('/:id/reject', authMiddleware, requireRoles('SUPER_ADMIN', 'SCHOOL_AD
       return res.status(404).json({ error: 'User not found.' });
     }
 
+    if (user.role === 'SUPER_ADMIN' && req.user!.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Only an executive administrator can review this role.' });
+    if (user.status !== 'PENDING') return res.status(409).json({ error: 'Only pending access requests can be rejected. Use the account status controls for an existing user.' });
+
     db.prepare('UPDATE users SET status = "REJECTED", updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
 
     logAudit(
@@ -132,6 +138,9 @@ router.put('/:id/status', authMiddleware, requireRoles('SUPER_ADMIN'), (req: Req
     const { status } = req.body;
     const db = getDb();
 
+    if (!['APPROVED', 'DISABLED', 'REJECTED', 'PENDING'].includes(status)) return res.status(400).json({ error: 'Choose a valid account status.' });
+    if (id === req.user!.id && status !== 'APPROVED') return res.status(400).json({ error: 'You cannot disable your own account.' });
+    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(id)) return res.status(404).json({ error: 'User not found.' });
     db.prepare('UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(status, id);
 
     logAudit(

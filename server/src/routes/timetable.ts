@@ -1,3 +1,4 @@
+import { accessibleStudents, scopeAcademicRecords, canAccessClass } from '../middleware/access.js';
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db.js';
 import { authMiddleware, logAudit } from '../middleware/auth.js';
@@ -32,7 +33,7 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
 
     query += ' ORDER BY CASE day_of_week WHEN "Monday" THEN 1 WHEN "Tuesday" THEN 2 WHEN "Wednesday" THEN 3 WHEN "Thursday" THEN 4 WHEN "Friday" THEN 5 ELSE 6 END, period_index ASC';
 
-    const slots = db.prepare(query).all(...params);
+    const slots = db.prepare(query).all(...params).filter(record => canAccessClass(record, req.user!, db));
     return res.json({ slots });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to fetch timetable.' });

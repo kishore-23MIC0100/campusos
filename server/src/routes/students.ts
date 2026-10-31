@@ -1,3 +1,4 @@
+import { accessibleStudents, scopeAcademicRecords, canAccessClass } from '../middleware/access.js';
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db.js';
 import { authMiddleware, logAudit } from '../middleware/auth.js';
@@ -33,7 +34,8 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
 
     query += ' ORDER BY grade ASC, section ASC, roll_no ASC';
 
-    const students = db.prepare(query).all(...params);
+    const allowed = accessibleStudents(req.user!, db);
+    const students = db.prepare(query).all(...params).filter(student => allowed === null || allowed.some(item => item.id === student.id));
     return res.json({ students });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to fetch students.' });
@@ -51,11 +53,14 @@ router.get('/:id', authMiddleware, (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Student not found.' });
     }
 
+    const allowed = accessibleStudents(req.user!, db);
+    if (allowed !== null && !allowed.some(item => item.id === student.id)) return res.status(403).json({ error: 'You cannot access this student record.' });
+
     // Related academic data
     const attendance = db.prepare('SELECT * FROM attendance_records WHERE student_id = ? ORDER BY date DESC LIMIT 30').all(student.id);
     const performance = db.prepare('SELECT * FROM performance_records WHERE student_id = ? ORDER BY exam_type, subject').all(student.id);
     const homework = db.prepare('SELECT * FROM homework WHERE grade = ? AND section = ? ORDER BY due_date DESC').all(student.grade, student.section);
-    const leaves = db.prepare('SELECT * FROM leave_requests WHERE applicant_id = ? OR applicant_name LIKE ? ORDER BY submitted_at DESC').all(student.user_id || '', `%${student.first_name}%`);
+    const leaves = db.prepare('SELECT * FROM leave_requests WHERE applicant_id = ? ORDER BY submitted_at DESC').all(student.user_id || '');
 
     return res.json({
       student,
@@ -75,6 +80,7 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
     const { firstName, lastName, gender, dob, grade, section, rollNo, bloodGroup, house, parentName, parentPhone, address } = req.body;
     const db = getDb();
 
+    if (![firstName, lastName, grade, section].every(value => typeof value === 'string' && value.trim() && value.length <= 120)) return res.status(400).json({ error: 'First name, last name, grade, and section are required.' });
     const id = `stu_${Date.now()}`;
     const studentId = `STU-2026-${Math.floor(1000 + Math.random() * 9000)}`;
     const admissionNo = `ADM-2026-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -102,6 +108,8 @@ router.put('/:id', authMiddleware, (req: Request, res: Response) => {
     const { firstName, lastName, grade, section, rollNo, parentName, parentPhone, address, status } = req.body;
     const db = getDb();
 
+    if (!db.prepare('SELECT id FROM students WHERE id = ?').get(id)) return res.status(404).json({ error: 'Student not found.' });
+    if (![firstName, lastName, grade, section].every(value => typeof value === 'string' && value.trim() && value.length <= 120)) return res.status(400).json({ error: 'First name, last name, grade, and section are required.' });
     db.prepare(`
       UPDATE students 
       SET first_name = ?, last_name = ?, grade = ?, section = ?, roll_no = ?, parent_name = ?, parent_phone = ?, address = ?, status = ?

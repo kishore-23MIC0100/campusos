@@ -1,44 +1,30 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
 import { getDb } from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
-
-// Institutional Summary Report
-router.get('/summary', authMiddleware, (req: Request, res: Response) => {
-  try {
-    const db = getDb();
-
-    const students = db.prepare('SELECT count(*) as count FROM students').get() as any;
-    const teachers = db.prepare('SELECT count(*) as count FROM teachers').get() as any;
-    const parents = db.prepare('SELECT count(*) as count FROM parents').get() as any;
-    const pendingLeaves = db.prepare('SELECT count(*) as count FROM leave_requests WHERE status = "PENDING"').get() as any;
-    const events = db.prepare('SELECT count(*) as count FROM events').get() as any;
-    const announcements = db.prepare('SELECT count(*) as count FROM announcements').get() as any;
-
-    return res.json({
-      metrics: {
-        totalStudents: students.count || 2481,
-        totalTeachers: teachers.count || 148,
-        totalParents: parents.count || 1920,
-        presentToday: 2410,
-        absentToday: 71,
-        attendanceRate: 97.1,
-        pendingLeaves: pendingLeaves.count || 0,
-        upcomingEvents: events.count || 0,
-        activeAnnouncements: announcements.count || 0,
-        academicHealthScore: 94.8,
-      },
-      institution: {
-        name: 'Oakridge International School',
-        affiliation: 'CBSE-AFF-2026-9801',
-        academicYear: '2025-2026',
-        reportGeneratedAt: new Date().toISOString(),
-      }
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to generate institutional report.' });
-  }
+router.get('/summary', authMiddleware, (_req, res) => {
+  const db = getDb();
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.SCHOOL_TIMEZONE || 'Asia/Kolkata' }).format(new Date());
+  const students = db.prepare('SELECT * FROM students').all();
+  const records = db.prepare('SELECT * FROM attendance_records WHERE date = ?').all(today);
+  const present = records.filter(record => ['PRESENT', 'LATE'].includes(record.status)).length;
+  const absent = records.filter(record => record.status === 'ABSENT').length;
+  const performance = db.prepare('SELECT * FROM performance_records').all().filter(record => Number(record.max_marks) > 0 && Number.isFinite(Number(record.marks_obtained)));
+  const school = db.prepare('SELECT * FROM school_profile LIMIT 1').get();
+  res.json({
+    metrics: {
+      totalStudents: students.length,
+      totalTeachers: db.prepare('SELECT count(*) FROM teachers').get().count,
+      totalParents: db.prepare('SELECT count(*) FROM parents').get().count,
+      presentToday: present, absentToday: absent,
+      attendanceRate: records.length ? Number((present / records.length * 100).toFixed(1)) : null,
+      pendingLeaves: db.prepare('SELECT count(*) FROM leave_requests WHERE status = "PENDING"').get().count,
+      upcomingEvents: db.prepare('SELECT * FROM events').all().filter(event => event.date >= today).length,
+      activeAnnouncements: db.prepare('SELECT count(*) FROM announcements').get().count,
+      academicHealthScore: performance.length ? Number((performance.reduce((sum, record) => sum + Number(record.marks_obtained) / Number(record.max_marks) * 100, 0) / performance.length).toFixed(1)) : null,
+    },
+    institution: { name: school?.name || 'CampusOS', affiliation: school?.affiliation_no || null, academicYear: school?.academic_year || null, reportGeneratedAt: new Date().toISOString() },
+  });
 });
-
 export default router;

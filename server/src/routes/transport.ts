@@ -1,3 +1,4 @@
+import { scopeAcademicRecords } from '../middleware/access.js';
 import express from 'express';
 import { getDb } from '../db.js';
 import { authMiddleware, requireRoles } from '../middleware/auth.js';
@@ -88,9 +89,7 @@ router.get('/routes/:id', authMiddleware, (req, res) => {
       .filter(s => s.route_id === id)
       .sort((a, b) => (Number(a.stop_sequence) || 0) - (Number(b.stop_sequence) || 0));
 
-    const students = (db.prepare('SELECT * FROM transport_allocations').all() as any[]).filter(
-      a => a.route_id === id
-    );
+    const students = scopeAcademicRecords((db.prepare('SELECT * FROM transport_allocations').all() as any[]).filter(a => a.route_id === id), req.user!, db);
 
     const vehicle = (db.prepare('SELECT * FROM transport_vehicles').all() as any[]).find(
       v => v.id === route.vehicle_id || v.vehicle_number === route.bus_number
@@ -114,29 +113,29 @@ router.post('/routes', authMiddleware, requireRoles('SUPER_ADMIN', 'SCHOOL_ADMIN
   try {
     const db = getDb();
     const {
-      routeNumber, routeName, startPoint, endPoint, morningStartTime = '06:45 AM',
-      eveningStartTime = '03:30 PM', busNumber, driverName, driverPhone,
+      routeNumber, routeName, startPoint, endPoint, morningStartTime,
+      eveningStartTime, busNumber, driverName, driverPhone,
       attendantName, attendantPhone, stops = []
     } = req.body;
 
-    if (!routeNumber || !routeName || !startPoint) {
-      return res.status(400).json({ error: 'Route number, name, and start point are required' });
-    }
+    if ([routeNumber, routeName, startPoint, endPoint, morningStartTime, eveningStartTime, busNumber, driverName, driverPhone].some(value => typeof value !== 'string' || !value.trim() || value.length > 200)) return res.status(400).json({ error: 'Provide route number, name, origin, destination, departure times, vehicle number and driver contact details.' });
+    if (!Array.isArray(stops) || stops.some(stop => !stop || typeof (stop.stopName || stop.name) !== 'string' || !(stop.stopName || stop.name).trim())) return res.status(400).json({ error: 'Each route stop must have a name.' });
+    if ((db.prepare('SELECT * FROM transport_routes').all() as any[]).some(route => String(route.route_number).toLowerCase() === routeNumber.trim().toLowerCase())) return res.status(409).json({ error: 'A route with this identifier already exists.' });
 
     const id = `rt_${Date.now()}`;
     const newRoute = {
       id,
-      route_number: routeNumber,
-      route_name: routeName,
-      start_point: startPoint,
-      end_point: endPoint || 'Oakridge International Main Campus',
+      route_number: routeNumber.trim(),
+      route_name: routeName.trim(),
+      start_point: startPoint.trim(),
+      end_point: endPoint.trim(),
       morning_start_time: morningStartTime,
       evening_start_time: eveningStartTime,
-      bus_number: busNumber || 'KA-01-EQ-1044',
-      driver_name: driverName || 'Raj Kumar',
-      driver_phone: driverPhone || '+91 98450 99881',
-      attendant_name: attendantName || 'Suresh Gowda',
-      attendant_phone: attendantPhone || '+91 98450 99882',
+      bus_number: busNumber.trim(),
+      driver_name: driverName.trim(),
+      driver_phone: driverPhone.trim(),
+      attendant_name: typeof attendantName === 'string' ? attendantName.trim() : '',
+      attendant_phone: typeof attendantPhone === 'string' ? attendantPhone.trim() : '',
       status: 'ACTIVE',
       current_transit_step: 0,
       created_at: new Date().toISOString(),
@@ -153,8 +152,8 @@ router.post('/routes', authMiddleware, requireRoles('SUPER_ADMIN', 'SCHOOL_ADMIN
         route_id: id,
         stop_name: st.stopName || st.name,
         stop_sequence: idx + 1,
-        morning_time: st.morningTime || '07:00 AM',
-        evening_time: st.eveningTime || '03:45 PM',
+        morning_time: st.morningTime || '',
+        evening_time: st.eveningTime || '',
         landmark: st.landmark || '',
       });
     });
@@ -237,7 +236,7 @@ router.get('/allocations', authMiddleware, (req, res) => {
   try {
     const db = getDb();
     const { routeId, studentId, search } = req.query;
-    let allocations = db.prepare('SELECT * FROM transport_allocations').all() as any[];
+    let allocations = scopeAcademicRecords(db.prepare('SELECT * FROM transport_allocations').all(), req.user!, db);
 
     if (routeId) {
       allocations = allocations.filter(a => a.route_id === routeId);
@@ -271,21 +270,26 @@ router.post('/allocate', authMiddleware, requireRoles('SUPER_ADMIN', 'SCHOOL_ADM
       return res.status(400).json({ error: 'Student ID and Route ID are required' });
     }
 
+    const student = (db.prepare('SELECT * FROM students').all() as any[]).find(student => [student.id, student.student_id, student.user_id].includes(studentId));
+    const route = (db.prepare('SELECT * FROM transport_routes').all() as any[]).find(route => route.id === routeId);
+    if (!student || !route) return res.status(404).json({ error: 'Select a registered student and an existing transport route.' });
+    const stop = (db.prepare('SELECT * FROM transport_stops').all() as any[]).find(stop => stop.route_id === routeId && (stop.id === stopId || stop.stop_name === stopName));
+    if (!stop && (typeof stopName !== 'string' || !stopName.trim())) return res.status(400).json({ error: 'Provide a pickup stop for this allocation.' });
+    const aliases = new Set([student.id, student.student_id, student.user_id].filter(Boolean));
     const allocationsTable = (db as any).data.transport_allocations || [];
-    // Remove previous allocation if any
-    (db as any).data.transport_allocations = allocationsTable.filter((a: any) => a.student_id !== studentId);
+    (db as any).data.transport_allocations = allocationsTable.filter((allocation: any) => !aliases.has(allocation.student_id));
 
     const newAlloc = {
       id: `alc_${Date.now()}`,
-      student_id: studentId,
-      student_name: studentName || 'Enrolled Student',
-      grade_section: gradeSection || 'Grade 10A',
+      student_id: student.id,
+      student_name: `${student.first_name} ${student.last_name}`,
+      grade_section: `${student.grade} ${student.section}`,
       route_id: routeId,
-      route_name: routeName || 'Assigned Route',
-      stop_id: stopId || 'stp_1',
-      stop_name: stopName || 'Designated Campus Stop',
-      pickup_time: pickupTime || '07:15 AM',
-      parent_phone: parentPhone || '+91 98765 43210',
+      route_name: `${route.route_number} - ${route.route_name}`,
+      stop_id: stop?.id || '',
+      stop_name: stop?.stop_name || stopName.trim(),
+      pickup_time: pickupTime || stop?.morning_time || route.morning_start_time || '',
+      parent_phone: parentPhone || student.parent_phone || '',
       status: 'ALLOCATED',
       created_at: new Date().toISOString(),
     };

@@ -12,43 +12,33 @@ export const StudentDetailPage: React.FC = () => {
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'academic' | 'attendance' | 'homework' | 'leaves'>('overview');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    let active = true;
     const load = async () => {
+      setLoading(true); setError('');
       try {
-        const res = await api.getStudent(id || 'stu_1');
-        setData(res);
+        if (!id) throw new Error('Choose a student from the directory to open their profile.');
+        const res = await api.getStudent(id);
+        if (active) setData(res);
       } catch (err) {
-        console.error(err);
+        if (active) setError(err instanceof Error ? err.message : 'The student profile could not be loaded.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     load();
-  }, [id]);
+    return () => { active = false; };
+  }, [id, attempt]);
 
   if (loading) {
     return <div className="py-20 text-center text-xs text-slate-400">Loading student profile dossier...</div>;
   }
 
-  const student = data?.student || {
-    first_name: 'Arav',
-    last_name: 'Patel',
-    student_id: 'STU-2026-8841',
-    admission_no: 'ADM-2021-0412',
-    grade: 'Grade 10',
-    section: 'A',
-    roll_no: 14,
-    gender: 'Male',
-    dob: '2010-04-14',
-    blood_group: 'O+',
-    house: 'Orion Blue',
-    attendance_pct: 96.4,
-    gpa: 3.92,
-    parent_name: 'Rajesh Patel',
-    parent_phone: '+91 98765 43210',
-    address: '42 Palm Avenue, Cyber City',
-  };
+  if (error || !data?.student) return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-rose-800" role="alert"><h1 className="text-lg font-semibold">Student profile unavailable</h1><p className="mt-2 text-sm">{error || 'This student record is unavailable.'}</p><div className="mt-5 flex gap-4"><button onClick={() => setAttempt(value => value + 1)} className="rounded-lg border border-rose-300 px-4 py-2 text-xs font-semibold">Try again</button><Link to="/students" className="px-4 py-2 text-xs font-semibold">Back to student directory</Link></div></div>;
+  const student = data.student;
 
   const performance = data?.performance || [];
   const attendance = data?.attendance || [];
@@ -74,7 +64,7 @@ export const StudentDetailPage: React.FC = () => {
             className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-semibold shadow-sm flex items-center gap-1.5"
           >
             <Printer className="w-4 h-4 text-slate-500" />
-            <span>Print Report Card</span>
+            <span>Print student profile</span>
           </button>
         </div>
       </div>
@@ -91,7 +81,7 @@ export const StudentDetailPage: React.FC = () => {
                 {student.first_name} {student.last_name}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-teal-100 text-teal-800">
-                ACTIVE ENROLLMENT
+                {student.status || 'Status not recorded'}
               </span>
             </div>
             <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
@@ -102,7 +92,7 @@ export const StudentDetailPage: React.FC = () => {
               <span>Adm #{student.admission_no}</span>
             </div>
             <div className="text-xs text-slate-400 mt-1">
-              Roll #{student.roll_no || 14} • House: {student.house || 'Orion Blue'} • Blood: {student.blood_group || 'O+'}
+              Roll #{student.roll_no ?? 'Not assigned'} • House: {student.house || 'Not recorded'} • Blood: {student.blood_group || 'Not recorded'}
             </div>
           </div>
         </div>
@@ -110,18 +100,18 @@ export const StudentDetailPage: React.FC = () => {
         {/* Quick Performance Indicators */}
         <div className="flex items-center gap-6 border-t sm:border-t-0 sm:border-l border-slate-100 pt-4 sm:pt-0 sm:pl-6">
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-teal-600 font-display">{student.attendance_pct || 96.4}%</div>
+            <div className="text-2xl font-extrabold text-teal-600 font-display">{data.attendance?.length ? `${(data.attendance.filter((item: any) => item.status === 'PRESENT' || item.status === 'LATE').length / data.attendance.length * 100).toFixed(1)}%` : 'N/A'}</div>
             <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Attendance</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-extrabold text-blue-800 font-display">{student.gpa || 3.92}</div>
-            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Term 1 GPA</div>
+            <div className="text-2xl font-extrabold text-blue-800 font-display">{student.gpa ?? 'N/A'}</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Recorded GPA</div>
           </div>
         </div>
       </div>
 
       {/* Tabs Switcher */}
-      <div className="flex items-center gap-2 border-b border-slate-200 text-xs font-semibold">
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 text-xs font-semibold">
         {[
           { key: 'overview', label: 'Overview & Profile' },
           { key: 'academic', label: 'Academic Performance' },
@@ -133,7 +123,7 @@ export const StudentDetailPage: React.FC = () => {
             key={t.key}
             type="button"
             onClick={() => setActiveTab(t.key as any)}
-            className={`pb-3 px-3 transition-colors border-b-2 font-bold ${
+            className={`pb-3 px-3 whitespace-nowrap transition-colors border-b-2 font-bold ${
               activeTab === t.key
                 ? 'border-teal-600 text-teal-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -152,19 +142,19 @@ export const StudentDetailPage: React.FC = () => {
             <div className="divide-y divide-slate-100 text-xs">
               <div className="py-2.5 flex justify-between"><span className="text-slate-500">Date of Birth:</span><span className="font-semibold">{student.dob}</span></div>
               <div className="py-2.5 flex justify-between"><span className="text-slate-500">Gender:</span><span className="font-semibold">{student.gender}</span></div>
-              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Academic Year:</span><span className="font-semibold">2025-2026</span></div>
-              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Class Mentor:</span><span className="font-semibold">Mrs. Priya Nair (Mathematics)</span></div>
-              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Residential Address:</span><span className="font-semibold">{student.address || '42 Palm Avenue'}</span></div>
+              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Academic Year:</span><span className="font-semibold">{student.academic_year || 'Not recorded'}</span></div>
+              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Class Mentor:</span><span className="font-semibold">{student.class_teacher || 'Not recorded'}</span></div>
+              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Residential Address:</span><span className="font-semibold">{student.address || 'Not recorded'}</span></div>
             </div>
           </div>
 
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Guardian & Emergency Contacts</h3>
             <div className="divide-y divide-slate-100 text-xs">
-              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Primary Guardian:</span><span className="font-semibold">{student.parent_name || 'Rajesh Patel'}</span></div>
-              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Guardian Phone:</span><span className="font-mono font-semibold">{student.parent_phone || '+91 98765 43210'}</span></div>
-              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Emergency Relation:</span><span className="font-semibold">Father</span></div>
-              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Transit Route:</span><span className="font-semibold">Bus Route 7 (Indiranagar)</span></div>
+              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Primary Guardian:</span><span className="font-semibold">{student.parent_name || 'Not recorded'}</span></div>
+              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Guardian Phone:</span><span className="font-mono font-semibold">{student.parent_phone || 'Not recorded'}</span></div>
+              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Emergency Relation:</span><span className="font-semibold">{student.emergency_relation || 'Not recorded'}</span></div>
+              <div className="py-2.5 flex justify-between"><span className="text-slate-500">Transit Route:</span><span className="font-semibold">{student.transport_route || 'Not recorded'}</span></div>
             </div>
           </div>
         </div>
@@ -173,7 +163,7 @@ export const StudentDetailPage: React.FC = () => {
       {/* TAB CONTENT: Academic */}
       {activeTab === 'academic' && (
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
-          <h3 className="text-base font-bold text-slate-900 font-display">Term 1 Assessment Records</h3>
+          <h3 className="text-base font-bold text-slate-900 font-display">Recorded assessment results</h3>
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px]">
               <tr>
@@ -186,6 +176,7 @@ export const StudentDetailPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {!performance.length && <tr><td colSpan={6} className="p-8 text-center text-slate-500">No assessment results recorded.</td></tr>}
               {performance.map((p: any) => (
                 <tr key={p.id}>
                   <td className="p-3 font-bold text-slate-900">{p.subject}</td>
@@ -206,6 +197,7 @@ export const StudentDetailPage: React.FC = () => {
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
           <h3 className="text-base font-bold text-slate-900 font-display">Attendance History</h3>
           <div className="divide-y divide-slate-100 text-xs">
+            {!attendance.length && <p className="py-8 text-center text-slate-500">No attendance records recorded.</p>}
             {attendance.map((att: any) => (
               <div key={att.id} className="py-2.5 flex items-center justify-between">
                 <div>
@@ -226,6 +218,7 @@ export const StudentDetailPage: React.FC = () => {
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
           <h3 className="text-base font-bold text-slate-900 font-display">Class Homework Tasks</h3>
           <div className="space-y-3 text-xs">
+            {!homework.length && <p className="py-8 text-center text-slate-500">No homework assignments recorded.</p>}
             {homework.map((hw: any) => (
               <div key={hw.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                 <div>
@@ -249,6 +242,7 @@ export const StudentDetailPage: React.FC = () => {
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
           <h3 className="text-base font-bold text-slate-900 font-display">Leave Applications</h3>
           <div className="divide-y divide-slate-100 text-xs">
+            {!leaves.length && <p className="py-8 text-center text-slate-500">No leave requests recorded.</p>}
             {leaves.map((lv: any) => (
               <div key={lv.id} className="py-3 flex items-center justify-between">
                 <div>

@@ -2,13 +2,24 @@
   "name": "campusos",
   "version": "1.0.0",
   "type": "module",
-  "description": "CampusOS — Intelligent School Management Platform",
+  "description": "CampusOS school management platform",
   "scripts": {
-    "dev": "npm run dev:server & npm run dev:client",
-    "dev:server": "cd server && npm run dev",
-    "dev:client": "cd client && npm run dev -- --host 0.0.0.0 --port 5173",
-    "build": "cd client && npm install && npm run build",
-    "start": "cd server && npm start"
+    "setup": "npm ci && npm --prefix client ci && npm --prefix server ci",
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev -- --host 0.0.0.0 --port 5173",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "npm --prefix client run build",
+    "build:server": "npm --prefix server run build",
+    "start": "npm --prefix server start",
+    "preview": "npm --prefix client run preview -- --host 0.0.0.0",
+    "test:client": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:server": "npm --prefix server test",
+    "test": "npm run test:client && npm run test:server",
+    "test:system": "node scripts/system-smoke.mjs",
+    "check": "npm test && npm run test:roles && npm run build",
+    "audit": "npm audit && npm --prefix client audit && npm --prefix server audit",
+    "test:roles": "server/node_modules/.bin/tsx scripts/system-roles.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -26,6 +37,8 @@
     "3d-campus",
     "rbac"
   ],
-  "author": "Google DeepMind Team",
-  "license": "ISC"
+  "license": "ISC",
+  "engines": {
+    "node": ">=24 <27"
+  }
 }

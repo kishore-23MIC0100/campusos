@@ -245,7 +245,7 @@ router.post('/', authMiddleware, (req, res) => {
         id: `mrk_${id}_${st.id}`,
         assessment_id: id,
         student_id: st.id,
-        student_name: st.full_name || st.name,
+        student_name: st.full_name || st.name || `${st.first_name} ${st.last_name}`,
         roll_no: st.roll_no || (idx + 1),
         marks_obtained: null,
         question_marks: '{}',
@@ -288,6 +288,15 @@ router.post('/:id/marks', authMiddleware, (req, res) => {
     const user = (req as any).user || {};
     const now = new Date().toISOString();
 
+    const roster = db.prepare('SELECT * FROM students WHERE grade = ? AND section = ?').all(assessment.grade, assessment.section);
+    const configuredQuestions = parseJson(assessment.questions);
+    for (const entry of marksList) {
+      const studentId = entry?.studentId || entry?.student_id;
+      if (!roster.some(student => student.id === studentId)) return res.status(400).json({ error: 'Each mark must belong to an enrolled student in this assessment.' });
+      const score = entry.marksObtained;
+      if (score !== null && score !== undefined && (!Number.isFinite(Number(score)) || Number(score) < 0 || Number(score) > maxMarks)) return res.status(400).json({ error: `Marks must be between zero and ${maxMarks}.` });
+      if (entry.questionMarks && configuredQuestions.some((q: any) => !Number.isFinite(Number(entry.questionMarks[q.id] || 0)) || Number(entry.questionMarks[q.id] || 0) < 0 || Number(entry.questionMarks[q.id] || 0) > Number(q.marks))) return res.status(400).json({ error: 'Question scores must be within each question’s maximum marks.' });
+    }
     marksList.forEach(entry => {
       const studentId = entry.studentId || entry.student_id;
       let target = marksTable.find((m: any) => m.assessment_id === id && m.student_id === studentId);
@@ -406,7 +415,7 @@ router.post('/:id/submit', authMiddleware, (req, res) => {
     const isQuestionAssessment = questions.length > 0;
     if ((!file?.name || !file?.data || !file?.type) && !isQuestionAssessment) return res.status(400).json({ error: 'Choose a completion file to submit.' });
     if (isQuestionAssessment && questions.some((q: any) => !String(answers[q.id] || '').trim())) return res.status(400).json({ error: 'Answer every question before submitting.' });
-    if (file?.data && String(file.data).length > 7_000_000) return res.status(413).json({ error: 'File is too large. Maximum upload size is 5 MB.' });
+    if (file?.data && String(file.data).length > 2_800_000) return res.status(413).json({ error: 'File is too large. Maximum upload size is 2 MB.' });
     let autoScore: number | null = null;
     let autoQuestionMarks: Record<string, number> = {};
     if (isQuestionAssessment) {

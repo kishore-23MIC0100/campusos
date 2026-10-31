@@ -1,10 +1,8 @@
+import { AccessibleDialog } from '../../components/common/AccessibleDialog';
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import {
-  Calendar, Plus, Search, MapPin, Clock, Users, Trophy,
-  Sparkles, CheckCircle2, X, ChevronRight, Tag
-} from 'lucide-react';
+import { Calendar, Plus, Search, MapPin, Users, CheckCircle2, X } from 'lucide-react';
 
 export const EventsPage: React.FC = () => {
   const { user } = useAuth();
@@ -18,7 +16,7 @@ export const EventsPage: React.FC = () => {
   // New Event form
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('ACADEMIC');
-  const [newDate, setNewDate] = useState('2026-10-15');
+  const [newDate, setNewDate] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()));
   const [newStartTime, setNewStartTime] = useState('09:00');
   const [newEndTime, setNewEndTime] = useState('17:00');
   const [newVenue, setNewVenue] = useState('Grand Auditorium');
@@ -72,7 +70,7 @@ export const EventsPage: React.FC = () => {
   const handleRSVP = async (id: string, title: string) => {
     try {
       await api.rsvpEvent(id);
-      setRsvpSuccess(`RSVP Confirmed for "${title}". Digital pass generated.`);
+      setRsvpSuccess(`RSVP Confirmed for "${title}". Your registration has been recorded.`);
       loadEvents();
       setTimeout(() => setRsvpSuccess(null), 4000);
     } catch (err: any) {
@@ -84,6 +82,7 @@ export const EventsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {loading && <p role="status" className="rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-600">Loading campus records...</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
@@ -187,7 +186,7 @@ export const EventsPage: React.FC = () => {
                 className="w-full py-2.5 rounded-xl bg-navy-800 hover:bg-navy-900 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
-                <span>RSVP & Get Digital Pass</span>
+                <span>Register attendance</span>
               </button>
             </div>
           </div>
@@ -196,11 +195,12 @@ export const EventsPage: React.FC = () => {
 
       {/* MODAL: Create Event */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-navy-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-scaleIn">
+        <AccessibleDialog title="Create campus event" onClose={() => setShowCreateModal(false)} busy={submitting} className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative animate-scaleIn">
             <button
               type="button"
               onClick={() => setShowCreateModal(false)}
+              aria-label="Close dialog"
+              disabled={submitting}
               className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700"
             >
               <X className="w-5 h-5" />
@@ -211,8 +211,8 @@ export const EventsPage: React.FC = () => {
 
             <form onSubmit={handleCreateEvent} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Event Title *</label>
-                <input
+                <label htmlFor="eventspage-field-1" className="block text-xs font-semibold text-slate-700 mb-1">Event Title *</label>
+                <input id="eventspage-field-1"
                   type="text"
                   required
                   value={newTitle}
@@ -224,8 +224,8 @@ export const EventsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Category *</label>
-                  <select
+                  <label htmlFor="eventspage-field-2" className="block text-xs font-semibold text-slate-700 mb-1">Category *</label>
+                  <select id="eventspage-field-2"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     className="glass-input w-full px-3 py-2 text-xs rounded-xl bg-white"
@@ -238,8 +238,8 @@ export const EventsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Date *</label>
-                  <input
+                  <label htmlFor="eventspage-field-3" className="block text-xs font-semibold text-slate-700 mb-1">Date *</label>
+                  <input id="eventspage-field-3"
                     type="date"
                     required
                     value={newDate}
@@ -250,9 +250,14 @@ export const EventsPage: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                <label className="block text-xs font-semibold text-slate-700">Starts at<input required type="time" value={newStartTime} onChange={event => setNewStartTime(event.target.value)} className="glass-input mt-1 w-full rounded-xl px-3 py-2" /></label>
+                <label className="block text-xs font-semibold text-slate-700">Ends at<input required type="time" value={newEndTime} onChange={event => setNewEndTime(event.target.value)} className="glass-input mt-1 w-full rounded-xl px-3 py-2" /></label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Venue *</label>
-                  <input
+                  <label htmlFor="eventspage-field-4" className="block text-xs font-semibold text-slate-700 mb-1">Venue *</label>
+                  <input id="eventspage-field-4"
                     type="text"
                     required
                     value={newVenue}
@@ -263,8 +268,8 @@ export const EventsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Capacity</label>
-                  <input
+                  <label htmlFor="eventspage-field-5" className="block text-xs font-semibold text-slate-700 mb-1">Capacity</label>
+                  <input id="eventspage-field-5"
                     type="number"
                     value={newCapacity}
                     onChange={(e) => setNewCapacity(parseInt(e.target.value, 10))}
@@ -274,8 +279,8 @@ export const EventsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Description *</label>
-                <textarea
+                <label htmlFor="eventspage-field-6" className="block text-xs font-semibold text-slate-700 mb-1">Description *</label>
+                <textarea id="eventspage-field-6"
                   required
                   rows={3}
                   value={newDescription}
@@ -293,8 +298,7 @@ export const EventsPage: React.FC = () => {
                 {submitting ? 'Publishing...' : 'Publish Campus Event'}
               </button>
             </form>
-          </div>
-        </div>
+        </AccessibleDialog>
       )}
     </div>
   );

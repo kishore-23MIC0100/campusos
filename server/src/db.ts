@@ -70,7 +70,7 @@ const defaultState: DatabaseState = {
   transport_allocations: [],
 };
 
-class PureDatabase {
+export class PureDatabase {
   private dataDir: string;
   private filePath: string;
   private data: DatabaseState;
@@ -81,12 +81,17 @@ class PureDatabase {
   private requestTail: Promise<void> = Promise.resolve();
 
   constructor() {
-    this.dataDir = path.resolve(process.cwd(), 'data');
+    this.dataDir = path.resolve(process.env.CAMPUSOS_DATA_DIR || path.join(process.cwd(), 'data'));
     this.filePath = path.join(this.dataDir, 'campusos_data.json');
     // Production must never fall back to the checked-in/local JSON database.
     this.data = this.usesPostgres || process.env.VERCEL
       ? JSON.parse(JSON.stringify(defaultState))
       : this.loadData();
+  }
+
+  public async close() {
+    if (this.saveTimeout) { clearTimeout(this.saveTimeout); this.saveTimeout = null; this.save(); }
+    if (this.pool) await this.pool.end();
   }
 
   public hasUsers() {
@@ -99,9 +104,11 @@ class PureDatabase {
       if (!connectionString) throw new Error('DATABASE_URL is required for the deployed CampusOS API.');
       this.pool = new Pool({
         connectionString,
-        ssl: { rejectUnauthorized: false },
+        ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: true },
         max: 3,
         connectionTimeoutMillis: 10000,
+        statement_timeout: 15000,
+        idle_in_transaction_session_timeout: 60000,
       });
     }
     return this.pool;
@@ -111,7 +118,7 @@ class PureDatabase {
    * A request-scoped lock makes the JSON-backed query adapter safe across
    * Vercel function instances while retaining the existing synchronous route API.
    */
-  public async beginRequest(): Promise<() => Promise<void>> {
+  public async beginRequest(): Promise<(commit?: boolean) => Promise<void>> {
     if (!this.usesPostgres) {
       if (process.env.VERCEL) throw new Error('DATABASE_URL is required for the deployed CampusOS API.');
       return async () => {};
@@ -125,6 +132,8 @@ class PureDatabase {
     let client: PoolClient | undefined;
     try {
       client = await this.getPool().connect();
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock($1)', [694327]);
       await client.query(`
         CREATE TABLE IF NOT EXISTS campusos_state (
           id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -132,8 +141,6 @@ class PureDatabase {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
-      await client.query('BEGIN');
-      await client.query('SELECT pg_advisory_xact_lock($1)', [694327]);
       const result = await client.query('SELECT state FROM campusos_state WHERE id = 1 FOR UPDATE');
       if (result.rows[0]?.state) {
         const saved = typeof result.rows[0].state === 'string'
@@ -145,8 +152,12 @@ class PureDatabase {
       }
       this.dirty = false;
 
-      return async () => {
+      let finished = false;
+      return async (commit = true) => {
+        if (finished) return;
+        finished = true;
         try {
+          if (!commit) { await client!.query('ROLLBACK'); return; }
           if (this.dirty) {
             await client!.query(
               `INSERT INTO campusos_state (id, state, updated_at)
@@ -184,7 +195,7 @@ class PureDatabase {
         return { ...defaultState, ...JSON.parse(raw) };
       }
     } catch (err) {
-      console.error('[Database Load Error] Using fresh default database state.', err);
+      throw new Error('Cannot read the CampusOS database. Restore the data file before starting.', { cause: err });
     }
     return JSON.parse(JSON.stringify(defaultState));
   }
@@ -198,9 +209,11 @@ class PureDatabase {
       if (!fs.existsSync(this.dataDir)) {
         fs.mkdirSync(this.dataDir, { recursive: true });
       }
-      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf-8');
+      const temporaryPath = `${this.filePath}.tmp`;
+      fs.writeFileSync(temporaryPath, JSON.stringify(this.data, null, 2), { encoding: 'utf-8', mode: 0o600 });
+      fs.renameSync(temporaryPath, this.filePath);
     } catch (err) {
-      console.error('[Database Save Error]', err);
+      throw new Error('Cannot persist the CampusOS database.', { cause: err });
     }
   }
 
@@ -220,9 +233,8 @@ class PureDatabase {
 
   public transaction(fn: (...args: any[]) => any) {
     return (...args: any[]) => {
-      const result = fn(...args);
-      this.save();
-      return result;
+      const snapshot = structuredClone(this.data);
+      try { const result = fn(...args); this.save(); return result; } catch (error) { this.data = snapshot; throw error; }
     };
   }
 
@@ -247,301 +259,135 @@ class PureDatabase {
   }
 
   private executeQuery(sql: string, params: any[]): any[] {
-    const lower = sql.toLowerCase();
-
-    // Table extraction: SELECT ... FROM <table> WHERE ...
     const fromMatch = sql.match(/FROM\s+([a-zA-Z0-9_]+)/i);
-    if (!fromMatch) return [];
-
+    if (!fromMatch) throw new Error('Unsupported query');
     const tableName = fromMatch[1].toLowerCase() as keyof DatabaseState;
-    const table = this.data[tableName] || [];
-
-    // Simple COUNT query
-    if (lower.startsWith('select count(*)')) {
-      return [{ count: table.length }];
+    let results = [...(this.data[tableName] || [])];
+    const where = sql.match(/\bWHERE\s+([\s\S]+?)(?:\s+ORDER BY|\s+LIMIT|$)/i)?.[1];
+    if (where) results = results.filter(this.predicate(where, params));
+    if (/^SELECT\s+COUNT\(\*\)/i.test(sql)) return [{ count: results.length }];
+    const order = sql.match(/ORDER BY\s+([\s\S]+?)(?:\s+LIMIT|$)/i)?.[1];
+    if (order) {
+      if (/CASE day_of_week/i.test(order)) {
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        results.sort((a, b) => days.indexOf(a.day_of_week) - days.indexOf(b.day_of_week) || Number(a.period_index) - Number(b.period_index));
+      } else if (/CASE WHEN status/i.test(order)) {
+        results.sort((a, b) => Number(b.status === 'PENDING') - Number(a.status === 'PENDING') || String(b.created_at || b.submitted_at || '').localeCompare(String(a.created_at || a.submitted_at || '')));
+      } else {
+        const fields = order.split(',').map(field => field.trim().split(/\s+/));
+        results.sort((a, b) => {
+          for (const [field, direction] of fields) {
+            const left = a[field] ?? ''; const right = b[field] ?? '';
+            const comparison = typeof left === 'number' && typeof right === 'number' ? left - right : String(left).localeCompare(String(right), undefined, { numeric: true });
+            if (comparison) return direction?.toUpperCase() === 'DESC' ? -comparison : comparison;
+          }
+          return 0;
+        });
+      }
     }
-
-    let results = [...table];
-
-    // Evaluate WHERE clauses if present
-    if (/WHERE/i.test(sql)) {
-      results = this.filterRecords(results, sql, params, tableName);
+    const limit = sql.match(/LIMIT\s+(\d+)/i)?.[1];
+    if (limit) results = results.slice(0, Number(limit));
+    const projection = sql.match(/^SELECT\s+([\s\S]+?)\s+FROM/i)?.[1].trim();
+    // Enforce SELECT projections: credentials and private fields must never leak
+    // through endpoints that explicitly request public profile columns.
+    if (projection && projection !== '*') {
+      const fields = projection.split(',').map(field => field.trim());
+      return results.map(row => Object.fromEntries(fields.map(field => [field, row[field]])));
     }
-
-    // ORDER BY
-    if (/ORDER BY/i.test(sql)) {
-      results = this.sortRecords(results, sql);
-    }
-
-    // LIMIT
-    const limitMatch = sql.match(/LIMIT\s+(\d+)/i);
-    if (limitMatch) {
-      const limit = parseInt(limitMatch[1], 10);
-      results = results.slice(0, limit);
-    }
-
     return results;
   }
 
-  private filterRecords(records: any[], sql: string, params: any[], tableName: string): any[] {
-    let pIdx = 0;
-
-    return records.filter(row => {
-      // 1. Users login lookup: LOWER(email) = ? OR LOWER(username) = ? OR LOWER(student_id) = ? OR phone = ?
-      if (tableName === 'users' && /LOWER\(email\)\s*=\s*\?/i.test(sql)) {
-        const p1 = String(params[0] || '').toLowerCase();
-        const p2 = String(params[1] || '').toLowerCase();
-        const p3 = String(params[2] || '').toLowerCase();
-        const p4 = String(params[3] || '');
-        return (
-          (row.email && row.email.toLowerCase() === p1) ||
-          (row.username && row.username.toLowerCase() === p2) ||
-          (row.student_id && row.student_id.toLowerCase() === p3) ||
-          (row.phone && row.phone === p4)
-        );
+  /** Parse the small SQL expression subset used by the existing routes.
+   * Unknown expressions fail closed instead of accidentally matching every row.
+   * Values are bound as tokens, never interpolated or evaluated as JavaScript.
+   */
+  private predicate(expression: string, params: any[]): (row: any) => boolean {
+    const tokens: any[] = expression.match(/\b(?:LOWER|LIKE|AND|OR|IN|IS|NOT|NULL)\b|[a-zA-Z_][a-zA-Z0-9_]*|\?|!=|<>|=|\(|\)|,|'(?:[^']|'')*'|"(?:[^"]|"")*"|\d+(?:\.\d+)?/gi) || [];
+    let bound = 0;
+    for (let i = 0; i < tokens.length; i++) if (tokens[i] === '?') tokens[i] = { value: params[bound++] };
+    let index = 0;
+    const peek = (value: string) => typeof tokens[index] === 'string' && tokens[index].toUpperCase() === value;
+    const consume = (value: string) => { if (!peek(value)) throw new Error(`Unsupported database expression: expected ${value}`); index++; };
+    type Value = (row: any) => any;
+    const operand = (): Value => {
+      const token = tokens[index++];
+      if (token && typeof token === 'object') return () => token.value;
+      if (typeof token !== 'string') throw new Error('Missing database operand');
+      if (token.toUpperCase() === 'LOWER') { consume('('); const inner = operand(); consume(')'); return row => String(inner(row) ?? '').toLowerCase(); }
+      if (token.toUpperCase() === 'NULL') return () => null;
+      if (/^['"]/.test(token)) return () => token.slice(1, -1).replace(/''/g, "'").replace(/""/g, '"');
+      if (/^\d/.test(token)) return () => Number(token);
+      return row => row[token.toLowerCase()];
+    };
+    const comparison = (): ((row: any) => boolean) => {
+      if (peek('(')) { consume('('); const inner = or(); consume(')'); return inner; }
+      const left = operand();
+      if (peek('IN')) {
+        consume('IN'); consume('('); const values = [operand()];
+        while (peek(',')) { consume(','); values.push(operand()); }
+        consume(')'); return row => values.some(value => String(left(row)) === String(value(row)));
       }
-
-      // 2. Users duplicate check: LOWER(email) = ? OR LOWER(username) = ?
-      if (tableName === 'users' && /LOWER\(email\)\s*=\s*\?\s*OR\s*LOWER\(username\)\s*=\s*\?/i.test(sql)) {
-        const p1 = String(params[0] || '').toLowerCase();
-        const p2 = String(params[1] || '').toLowerCase();
-        return (
-          (row.email && row.email.toLowerCase() === p1) ||
-          (row.username && row.username.toLowerCase() === p2)
-        );
-      }
-
-      // 3. Simple ID lookup: WHERE id = ? OR student_id = ?
-      if (/WHERE\s+id\s*=\s*\?\s*OR\s*student_id\s*=\s*\?/i.test(sql)) {
-        const p1 = params[0];
-        const p2 = params[1];
-        return row.id === p1 || row.student_id === p2;
-      }
-
-      // 4. Simple ID lookup: WHERE id = ? OR employee_id = ?
-      if (/WHERE\s+id\s*=\s*\?\s*OR\s*employee_id\s*=\s*\?/i.test(sql)) {
-        const p1 = params[0];
-        const p2 = params[1];
-        return row.id === p1 || row.employee_id === p2;
-      }
-
-      // 5. Single ID lookup: WHERE id = ?
-      if (/WHERE\s+id\s*=\s*\?/i.test(sql)) {
-        return row.id === params[0];
-      }
-
-      // 5b. IN clause lookup: WHERE id IN (?, ?, ...)
-      if (/WHERE\s+id\s+IN\s*\(/i.test(sql)) {
-        return params.includes(row.id) || params.includes(row.student_id);
-      }
-
-      // 6. Generic parameter matching
-      let matches = true;
-      let curParam = 0;
-
-      if (/AND\s+role\s*=\s*\?/i.test(sql)) {
-        if (row.role !== params[curParam++]) return false;
-      }
-      if (/AND\s+status\s*=\s*\?/i.test(sql)) {
-        if (row.status !== params[curParam++]) return false;
-      }
-      if (/AND\s+grade\s*=\s*\?/i.test(sql)) {
-        if (row.grade !== params[curParam++]) return false;
-      }
-      if (/AND\s+section\s*=\s*\?/i.test(sql)) {
-        if (row.section !== params[curParam++]) return false;
-      }
-      if (/AND\s+subject\s*=\s*\?/i.test(sql)) {
-        if (row.subject !== params[curParam++]) return false;
-      }
-      if (/AND\s+department\s*=\s*\?/i.test(sql)) {
-        if (row.department !== params[curParam++]) return false;
-      }
-      if (/AND\s+category\s*=\s*\?/i.test(sql)) {
-        if (row.category !== params[curParam++]) return false;
-      }
-      if (/AND\s+priority\s*=\s*\?/i.test(sql)) {
-        if (row.priority !== params[curParam++]) return false;
-      }
-      if (/AND\s+date\s*=\s*\?/i.test(sql)) {
-        if (row.date !== params[curParam++]) return false;
-      }
-      if (/AND\s+student_id\s*=\s*\?/i.test(sql)) {
-        if (row.student_id !== params[curParam++]) return false;
-      }
-      if (/AND\s+day_of_week\s*=\s*\?/i.test(sql)) {
-        if (row.day_of_week !== params[curParam++]) return false;
-      }
-
-      // Search term matching
-      if (/LIKE\s*\?/i.test(sql) && curParam < params.length) {
-        const term = String(params[curParam] || '').replace(/%/g, '').toLowerCase();
-        const jsonStr = JSON.stringify(row).toLowerCase();
-        if (!jsonStr.includes(term)) return false;
-      }
-
-      // Timetable conflict checks
-      if (/day_of_week\s*=\s*\?\s*AND\s*period_index\s*=\s*\?\s*AND\s*LOWER\(teacher_name\)\s*=\s*\?/i.test(sql)) {
-        return row.day_of_week === params[0] && row.period_index == params[1] && (row.teacher_name || '').toLowerCase() === String(params[2]).toLowerCase();
-      }
-      if (/day_of_week\s*=\s*\?\s*AND\s*period_index\s*=\s*\?\s*AND\s*LOWER\(room_number\)\s*=\s*\?/i.test(sql)) {
-        return row.day_of_week === params[0] && row.period_index == params[1] && (row.room_number || '').toLowerCase() === String(params[2]).toLowerCase();
-      }
-
-      // Homework student check
-      if (/homework_id\s*=\s*\?\s*AND\s*student_id\s*=\s*\?/i.test(sql)) {
-        return row.homework_id === params[0] && (row.student_id === params[1] || row.student_name === params[1]);
-      }
-
-      // Parent ID lookup: WHERE user_id = ? OR email = ?
-      if (/user_id\s*=\s*\?\s*OR\s*email\s*=\s*\?/i.test(sql)) {
-        return row.user_id === params[0] || (row.email && row.email === params[1]);
-      }
-
-      // Parent student lookup
-      if (/parent_id\s*=\s*\?\s*OR\s*LOWER\(parent_name\)\s*LIKE\s*\?/i.test(sql)) {
-        const term = String(params[1] || '').replace(/%/g, '').toLowerCase();
-        return row.parent_id === params[0] || (row.parent_name && row.parent_name.toLowerCase().includes(term));
-      }
-
-      // Assessment, transport, payroll filters
-      if (/WHERE\s+assessment_id\s*=\s*\?/i.test(sql)) {
-        return row.assessment_id === params[0];
-      }
-      if (/WHERE\s+route_id\s*=\s*\?/i.test(sql)) {
-        return row.route_id === params[0];
-      }
-      if (/WHERE\s+employee_id\s*=\s*\?/i.test(sql)) {
-        return row.employee_id === params[0];
-      }
-      if (/WHERE\s+faculty_id\s*=\s*\?/i.test(sql)) {
-        return row.faculty_id === params[0];
-      }
-      if (/assessment_id\s*=\s*\?\s*AND\s*student_id\s*=\s*\?/i.test(sql)) {
-        return row.assessment_id === params[0] && row.student_id === params[1];
-      }
-      if (/month\s*=\s*\?\s*AND\s*year\s*=\s*\?/i.test(sql)) {
-        return String(row.month).toLowerCase() === String(params[0]).toLowerCase() && Number(row.year) === Number(params[1]);
-      }
-
-      return matches;
-    });
-  }
-
-  private sortRecords(records: any[], sql: string): any[] {
-    if (/status\s*=\s*['"]PENDING['"]/i.test(sql)) {
-      records.sort((a, b) => {
-        if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
-        if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
-        return (b.created_at || '').localeCompare(a.created_at || '');
-      });
-    } else if (/due_date/i.test(sql)) {
-      records.sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
-    } else if (/date\s+DESC/i.test(sql)) {
-      records.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    } else if (/date\s+ASC/i.test(sql)) {
-      records.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    } else if (/created_at\s+DESC/i.test(sql)) {
-      records.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-    } else if (/period_index/i.test(sql)) {
-      records.sort((a, b) => (a.period_index || 0) - (b.period_index || 0));
-    } else if (/roll_no/i.test(sql)) {
-      records.sort((a, b) => (a.roll_no || 0) - (b.roll_no || 0));
-    }
-    return records;
+      if (peek('IS')) { consume('IS'); const negate = peek('NOT'); if (negate) consume('NOT'); consume('NULL'); return row => negate ? left(row) != null : left(row) == null; }
+      const op = String(tokens[index++]).toUpperCase(); const right = operand();
+      if (op === '=') return row => left(row) != null && right(row) != null && String(left(row)) === String(right(row));
+      if (op === '!=' || op === '<>') return row => String(left(row)) !== String(right(row));
+      if (op === 'LIKE') return row => {
+        const pattern = String(right(row) ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.');
+        return new RegExp(`^${pattern}$`, 'i').test(String(left(row) ?? ''));
+      };
+      throw new Error(`Unsupported database operator ${op}`);
+    };
+    const and = (): ((row: any) => boolean) => { let left = comparison(); while (peek('AND')) { consume('AND'); const prior = left; const right = comparison(); left = row => prior(row) && right(row); } return left; };
+    const or = (): ((row: any) => boolean) => { let left = and(); while (peek('OR')) { consume('OR'); const prior = left; const right = and(); left = row => prior(row) || right(row); } return left; };
+    const result = or();
+    if (index !== tokens.length || bound !== params.length) throw new Error('Unsupported or incorrectly bound database expression');
+    return result;
   }
 
   private executeUpdate(sql: string, params: any[]): number {
-    const trimmed = sql.trim();
-
-    // 1. INSERT INTO <table> (...) VALUES (...)
-    const insertMatch = trimmed.match(/INSERT\s+INTO\s+([a-zA-Z0-9_]+)\s*\(([^)]+)\)\s*VALUES/i);
-    if (insertMatch) {
-      const tableName = insertMatch[1].toLowerCase() as keyof DatabaseState;
-      const columns = insertMatch[2].split(',').map(c => c.trim().toLowerCase());
-      const newRow: any = { created_at: new Date().toISOString() };
-
-      columns.forEach((col, i) => {
-        newRow[col] = params[i] !== undefined ? params[i] : null;
+    const insert = sql.match(/INSERT\s+INTO\s+([a-zA-Z0-9_]+)\s*\(([^)]+)\)\s*VALUES/i);
+    if (insert) {
+      const tableName = insert[1].toLowerCase() as keyof DatabaseState;
+      const columns = insert[2].split(',').map(column => column.trim().toLowerCase());
+      if (columns.length !== params.length) throw new Error('Insert values do not match the declared columns.');
+      const row: any = { created_at: new Date().toISOString() };
+      columns.forEach((column, i) => { row[column] = params[i] ?? null; });
+      this.data[tableName] ||= [];
+      if (row.id && this.data[tableName].some(existing => existing.id === row.id)) throw new Error('Duplicate record identifier');
+      this.data[tableName].push(row); return 1;
+    }
+    const update = sql.match(/^UPDATE\s+(\w+)\s+SET\s+([\s\S]+?)(?:\s+WHERE\s+([\s\S]+))?$/i);
+    if (update) {
+      const tableName = update[1].toLowerCase() as keyof DatabaseState;
+      let offset = 0;
+      const assignments = update[2].split(',').map(assignment => {
+        const match = assignment.trim().match(/^(\w+)\s*=\s*([\s\S]+)$/);
+        if (!match) throw new Error('Invalid update assignment');
+        const [, field, value] = match;
+        if (value === '?') { const bound = params[offset++]; return (row: any) => { row[field] = bound; }; }
+        if (/CURRENT_TIMESTAMP/i.test(value)) return (row: any) => { row[field] = new Date().toISOString(); };
+        if (/^['"].*['"]$/.test(value)) return (row: any) => { row[field] = value.slice(1, -1); };
+        if (/^\d+(?:\.\d+)?$/.test(value)) return (row: any) => { row[field] = Number(value); };
+        const increment = value.match(/^(\w+)\s*\+\s*(\d+)$/);
+        if (increment) return (row: any) => { row[field] = Number(row[increment[1]] || 0) + Number(increment[2]); };
+        throw new Error('Unsupported update assignment');
       });
-
-      if (!this.data[tableName]) {
-        this.data[tableName] = [];
-      }
-      this.data[tableName].push(newRow);
-      return 1;
+      const matches = update[3] ? this.predicate(update[3], params.slice(offset)) : () => true;
+      let changes = 0;
+      for (const row of this.data[tableName] || []) if (matches(row)) { assignments.forEach(assign => assign(row)); row.updated_at = new Date().toISOString(); changes++; }
+      return changes;
     }
-
-    // 2. UPDATE <table> SET ... WHERE ...
-    const updateMatch = trimmed.match(/UPDATE\s+([a-zA-Z0-9_]+)\s+SET\s+(.+)\s+WHERE\s+(.+)/i);
-    if (updateMatch) {
-      const tableName = updateMatch[1].toLowerCase() as keyof DatabaseState;
-      const table = this.data[tableName] || [];
-      const setClause = updateMatch[2];
-      const whereClause = updateMatch[3];
-
-      let updatedCount = 0;
-
-      // Extract set assignments
-      const setFields = setClause.split(',').map(s => s.trim().split('=')[0].trim().toLowerCase());
-
-      table.forEach(row => {
-        let isMatch = false;
-        if (/WHERE\s+id\s*=\s*\?/i.test(trimmed)) {
-          const targetId = params[params.length - 1];
-          isMatch = row.id === targetId;
-        } else {
-          isMatch = true;
-        }
-
-        if (isMatch) {
-          setFields.forEach((field, i) => {
-            if (field !== 'updated_at') {
-              row[field] = params[i];
-            } else {
-              row[field] = new Date().toISOString();
-            }
-          });
-          row.updated_at = new Date().toISOString();
-          updatedCount++;
-        }
-      });
-
-      return updatedCount;
+    const deletion = sql.match(/^DELETE\s+FROM\s+(\w+)\s+WHERE\s+([\s\S]+)$/i);
+    if (deletion) {
+      const tableName = deletion[1].toLowerCase() as keyof DatabaseState;
+      const matches = this.predicate(deletion[2], params);
+      const before = (this.data[tableName] || []).length;
+      this.data[tableName] = (this.data[tableName] || []).filter(row => !matches(row));
+      return before - this.data[tableName].length;
     }
-
-    // 3. DELETE FROM <table> WHERE ...
-    const deleteMatch = trimmed.match(/DELETE\s+FROM\s+([a-zA-Z0-9_]+)\s+WHERE\s+(.+)/i);
-    if (deleteMatch) {
-      const tableName = deleteMatch[1].toLowerCase() as keyof DatabaseState;
-      const initialLen = (this.data[tableName] || []).length;
-
-      if (/WHERE\s+id\s*=\s*\?/i.test(trimmed)) {
-        const targetId = params[0];
-        this.data[tableName] = (this.data[tableName] || []).filter(r => r.id !== targetId);
-      } else if (/WHERE\s+grade\s*=\s*\?\s*AND\s*section\s*=\s*\?\s*AND\s*date\s*=\s*\?/i.test(trimmed)) {
-        this.data[tableName] = (this.data[tableName] || []).filter(
-          r => !(r.grade === params[0] && r.section === params[1] && r.date === params[2])
-        );
-      } else if (/WHERE\s+homework_id\s*=\s*\?/i.test(trimmed)) {
-        this.data[tableName] = (this.data[tableName] || []).filter(
-          r => r.homework_id !== params[0]
-        );
-      } else if (/WHERE\s+assessment_id\s*=\s*\?/i.test(trimmed)) {
-        this.data[tableName] = (this.data[tableName] || []).filter(
-          r => r.assessment_id !== params[0]
-        );
-      } else if (/WHERE\s+route_id\s*=\s*\?/i.test(trimmed)) {
-        this.data[tableName] = (this.data[tableName] || []).filter(
-          r => r.route_id !== params[0]
-        );
-      }
-
-      return initialLen - (this.data[tableName] || []).length;
-    }
-
-    return 0;
+    throw new Error('Unsupported database mutation');
   }
+
 }
 
 let dbInstance: PureDatabase | null = null;

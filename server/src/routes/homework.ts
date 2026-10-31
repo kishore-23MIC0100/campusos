@@ -1,3 +1,4 @@
+import { accessibleStudents, scopeAcademicRecords, canAccessClass } from '../middleware/access.js';
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db.js';
 import { authMiddleware, logAudit } from '../middleware/auth.js';
@@ -34,7 +35,7 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
 
     query += ' ORDER BY due_date ASC';
 
-    const homeworkList = db.prepare(query).all(...params);
+    const homeworkList = db.prepare(query).all(...params).filter(record => canAccessClass(record, req.user!, db));
 
     // If user is a student, attach submission status
     if (req.user!.role === 'STUDENT') {
@@ -66,7 +67,8 @@ router.get('/:id', authMiddleware, (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Homework not found.' });
     }
 
-    const submissions = db.prepare('SELECT * FROM homework_submissions WHERE homework_id = ? ORDER BY submission_date DESC').all(id);
+    if (!canAccessClass(hw, req.user!, db)) return res.status(403).json({ error: 'This assignment is not part of your class.' });
+    const submissions = scopeAcademicRecords(db.prepare('SELECT * FROM homework_submissions WHERE homework_id = ? ORDER BY submission_date DESC').all(id), req.user!, db);
 
     return res.json({
       homework: hw,
@@ -181,6 +183,7 @@ router.post('/:id/submit', authMiddleware, (req: Request, res: Response) => {
     const submissionId = `sub_${Date.now()}`;
 
     // Upsert submission
+    if (!canAccessClass(hw, req.user!, db)) return res.status(403).json({ error: 'This assignment is not part of your class.' });
     db.prepare('DELETE FROM homework_submissions WHERE homework_id = ? AND student_id = ?').run(id, studentId);
 
     db.prepare(`

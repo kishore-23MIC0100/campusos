@@ -1,65 +1,184 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CalendarDays, Megaphone, Bus, Calendar, ArrowUpRight, Clock3, CheckCircle2 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { api } from '../../services/api';
+import { useCallback } from "react";
+import { Link } from "react-router-dom";
+import {
+  CalendarDays,
+  Megaphone,
+  Bus,
+  Calendar,
+  Clock3,
+  CheckCircle2,
+  ArrowUpRight,
+  Wrench,
+} from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { api } from "../../services/api";
+import {
+  DashboardFeedback,
+  DashboardHeader,
+  EmptyState,
+  EventsList,
+  MetricGrid,
+  Notices,
+  Panel,
+  QuickLinks,
+  formatDate,
+  useWorkspaceData,
+} from "./WorkspaceOverview";
 
-export const StaffDashboard: React.FC = () => {
+export function StaffDashboard() {
   const { user } = useAuth();
-  const [myLeaves, setMyLeaves] = useState<any[]>([]);
-
-  useEffect(() => {
-    api.getLeaves({ status: 'ALL' })
-      .then((result) => setMyLeaves(result.leaves || []))
-      .catch((error) => console.error('[Staff leave summary]', error));
-  }, []);
-
-  const pendingCount = myLeaves.filter((leave) => leave.status === 'PENDING').length;
-  const latestLeave = myLeaves[0];
-  const shortcuts = [
-    { to: '/leave', label: 'Leave & requests', description: 'Apply and follow your request status', icon: CalendarDays, color: 'from-teal-600 to-cyan-600' },
-    { to: '/announcements', label: 'Campus notices', description: 'Read current school announcements', icon: Megaphone, color: 'from-indigo-600 to-violet-600' },
-    { to: '/transport', label: 'Transport', description: 'View campus transport information', icon: Bus, color: 'from-amber-500 to-orange-600' },
-    { to: '/events', label: 'Campus events', description: 'See upcoming activities and events', icon: Calendar, color: 'from-emerald-600 to-teal-600' },
-  ];
-
+  const load = useCallback(async () => {
+    const [leaves, notices, events] = await Promise.all([
+      api.getLeaves({ status: "ALL" }),
+      api.getAnnouncements(),
+      api.getEvents(),
+    ]);
+    return {
+      leaves: leaves.leaves.filter((item) => item.applicant_id === user?.id),
+      notices: notices.announcements,
+      events: events.events,
+    };
+  }, [user?.id]);
+  const { data, loading, error, refresh } = useWorkspaceData(load);
+  const latestLeave = data?.leaves[0];
+  const pending =
+    data?.leaves.filter((item) => item.status === "PENDING").length || 0;
+  const approved =
+    data?.leaves.filter((item) => item.status === "APPROVED").length || 0;
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-teal-50 to-indigo-50 p-7 shadow-sm sm:p-9">
-        <div className="absolute -right-12 -top-16 h-56 w-56 rounded-full bg-teal-200/40 blur-3xl" />
-        <div className="relative max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-white/80 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-teal-800">Staff workspace</span>
-          <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900">Welcome, {user?.fullName || 'Campus colleague'}</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Your staff account has access to self-service requests and campus information. Leadership and academic administration tools remain restricted to their authorized roles.</p>
-        </div>
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div><p className="text-xs font-bold uppercase tracking-wider text-slate-500">My pending leave</p><p className="mt-2 text-3xl font-extrabold text-slate-900">{pendingCount}</p></div>
-            <div className="rounded-xl bg-amber-50 p-3 text-amber-700"><Clock3 className="h-5 w-5" /></div>
-          </div>
-          <Link to="/leave" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-teal-800 hover:text-teal-950">Open leave requests <ArrowUpRight className="h-4 w-4" /></Link>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div><p className="text-xs font-bold uppercase tracking-wider text-slate-500">Latest leave status</p><p className="mt-2 text-lg font-extrabold text-slate-900">{latestLeave ? String(latestLeave.status).replace('_', ' ') : 'No requests yet'}</p></div>
-            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-700"><CheckCircle2 className="h-5 w-5" /></div>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">{latestLeave ? `${latestLeave.leave_type} • ${latestLeave.from_date} to ${latestLeave.to_date}` : 'Submit leave and track its review here.'}</p>
-        </div>
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2">
-        {shortcuts.map(({ to, label, description, icon: Icon, color }) => (
-          <Link key={to} to={to} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-            <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${color} text-white shadow-md`}><Icon className="h-5 w-5" /></span>
-            <span className="min-w-0 flex-1"><span className="block font-bold text-slate-900">{label}</span><span className="mt-1 block text-xs text-slate-500">{description}</span></span>
-            <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-teal-700" />
+    <div className="workspace-overview">
+      <DashboardHeader
+        eyebrow="Staff workspace"
+        title="Your day, connected."
+        description="For technicians, IT support, facilities, security, office and other campus staff."
+        refresh={refresh}
+        loading={loading}
+        action={
+          <Link to="/leave" className="workspace-primary">
+            Apply for leave <ArrowUpRight size={15} />
           </Link>
-        ))}
-      </section>
+        }
+      />
+      <DashboardFeedback loading={loading} error={error} refresh={refresh}>
+        <MetricGrid
+          items={[
+            {
+              label: "My leave requests",
+              value: data?.leaves.length || 0,
+              detail: "Requests submitted by you",
+              icon: CalendarDays,
+              featured: true,
+            },
+            {
+              label: "Awaiting review",
+              value: pending,
+              detail: "Pending administrator approval",
+              icon: Clock3,
+            },
+            {
+              label: "Approved requests",
+              value: approved,
+              detail: "Your approved leave requests",
+              icon: CheckCircle2,
+            },
+            {
+              label: "Campus notices",
+              value: data?.notices.length || 0,
+              detail: "Announcements available to you",
+              icon: Megaphone,
+            },
+          ]}
+        />
+        <div className="overview-grid overview-grid-main">
+          <Panel
+            title="Campus announcements"
+            description="Stay informed about what's happening at school"
+            to="/announcements"
+          >
+            <Notices notices={data?.notices || []} />
+          </Panel>
+          <Panel
+            title="Your staff essentials"
+            description="Everything you need for the working day"
+          >
+            <QuickLinks
+              links={[
+                {
+                  to: "/staff-services",
+                  title: "Staff teams & technicians",
+                  description:
+                    "Find IT, technical, maintenance and support colleagues",
+                  icon: Wrench,
+                },
+                {
+                  to: "/leave",
+                  title: "Leave & requests",
+                  description: "Apply and track approval status",
+                  icon: CalendarDays,
+                },
+                {
+                  to: "/transport",
+                  title: "Campus transport",
+                  description: "Routes, stops and fleet information",
+                  icon: Bus,
+                },
+                {
+                  to: "/events",
+                  title: "Campus events",
+                  description: "Explore activities and register",
+                  icon: Calendar,
+                },
+                {
+                  to: "/announcements",
+                  title: "Notice board",
+                  description: "Read school circulars and updates",
+                  icon: Megaphone,
+                },
+              ]}
+            />
+          </Panel>
+        </div>
+        <div className="overview-grid overview-grid-main">
+          <Panel
+            title="Your latest request"
+            to="/leave"
+            linkLabel="All requests"
+          >
+            {latestLeave ? (
+              <div className="overview-request">
+                <div>
+                  <span className="overview-tag">
+                    {String(latestLeave.leave_type).replaceAll("_", " ")}
+                  </span>
+                  <span
+                    className={`overview-status ${latestLeave.status === "APPROVED" ? "is-approved" : latestLeave.status === "REJECTED" ? "is-rejected" : ""}`}
+                  >
+                    {String(latestLeave.status).toLowerCase()}
+                  </span>
+                </div>
+                <h3>
+                  {formatDate(latestLeave.from_date)} to{" "}
+                  {formatDate(latestLeave.to_date)}
+                </h3>
+                <p>{latestLeave.reason}</p>
+                <span>
+                  {latestLeave.total_days} day
+                  {Number(latestLeave.total_days) === 1 ? "" : "s"} requested
+                </span>
+              </div>
+            ) : (
+              <EmptyState
+                title="No leave requests yet"
+                description="When you apply for leave, you can follow its review here."
+                icon={CalendarDays}
+              />
+            )}
+          </Panel>
+          <Panel title="Coming up on campus" to="/events">
+            <EventsList events={data?.events || []} />
+          </Panel>
+        </div>
+      </DashboardFeedback>
     </div>
   );
-};
+}
