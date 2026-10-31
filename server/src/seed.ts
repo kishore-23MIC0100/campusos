@@ -325,7 +325,7 @@ export async function seedDatabase() {
     'A',
     'usr_teacher_2',
     'Dr. Marcus Vance',
-    'Execute the digital twin induction experiment on CampusOS Lab and submit summary observations on magnetic flux variations.',
+    'Execute the digital twin induction experiment on Scholaxys Lab and submit summary observations on magnetic flux variations.',
     '2026-09-18',
     'NORMAL',
     JSON.stringify(['lab_guide_faraday.pdf']),
@@ -428,7 +428,7 @@ export async function seedDatabase() {
 
   insertEvent.run(
     'evt_1',
-    'CampusOS Annual Innovation & STEM Summit 2026',
+    'Scholaxys Annual Innovation & STEM Summit 2026',
     'ACADEMIC',
     '2026-10-15',
     '09:00',
@@ -633,7 +633,7 @@ export async function seedDatabase() {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  insertAudit.run('aud_1', 'usr_admin_1', 'Dr. Alistair Sterling', 'SUPER_ADMIN', 'SYSTEM_INITIALIZED', 'SYSTEM', 'SYS-001', 'CampusOS core database initialized with Oakridge profile and RBAC policies', '127.0.0.1', 'CampusOS-Kernel/4.8');
+  insertAudit.run('aud_1', 'usr_admin_1', 'Dr. Alistair Sterling', 'SUPER_ADMIN', 'SYSTEM_INITIALIZED', 'SYSTEM', 'SYS-001', 'Scholaxys core database initialized with Oakridge profile and RBAC policies', '127.0.0.1', 'Scholaxys-Kernel/4.8');
   insertAudit.run('aud_2', 'usr_teacher_1', 'Mrs. Priya Nair', 'TEACHER', 'ATTENDANCE_MARKED', 'ATTENDANCE', 'cls_10a', 'Attendance marked for Grade 10 Section A (38 enrolled, 37 present, 1 excused)', '192.168.1.104', 'Mozilla/5.0 Mac OS X');
   insertAudit.run('aud_3', 'usr_admin_1', 'Dr. Alistair Sterling', 'SUPER_ADMIN', 'LEAVE_APPROVED', 'LEAVE', 'lv_2', 'Approved Dr. Marcus Vance casual leave for National Science Symposium', '192.168.1.10', 'Mozilla/5.0 Mac OS X');
   insertAudit.run('aud_4', 'usr_teacher_1', 'Mrs. Priya Nair', 'TEACHER', 'HOMEWORK_PUBLISHED', 'HOMEWORK', 'hw_1', 'Published Calculus optimization problem set for Grade 10A', '192.168.1.104', 'Mozilla/5.0 Mac OS X');

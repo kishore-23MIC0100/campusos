@@ -637,3 +637,4 @@ select.input-dark {
 
 /* Route-level loading stays visible while modules are fetched. */
 .route-loading { min-height: 100dvh; display: grid; place-content: center; background: #f4f7f8; color: #526c70; font-family: 'Outfit', sans-serif; font-size: 14px; }
+.brand-wordmark-accent { color: #0d9488; }

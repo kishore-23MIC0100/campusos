@@ -1,6 +1,6 @@
-# CampusOS
+# Scholaxys
 
-CampusOS is a React school operations workspace with role-specific dashboards, a Three.js / React Three Fiber campus landing experience, and an Express API. PostgreSQL persists deployed records; a local JSON database supports development demos.
+Scholaxys is a React school operations workspace with role-specific dashboards, a Three.js / React Three Fiber campus landing experience, and an Express API. PostgreSQL persists deployed records; a local JSON database supports development demos.
 
 ## Run locally
 
@@ -90,3 +90,10 @@ Run `npm --prefix server run configure:portals -- --local` and supply one JSON l
 Set the resulting value as the sensitive server variable `CAMPUSOS_SHARED_PORTAL_ACCOUNTS` on the intended Vercel environment. Do not copy it to a preview that shares production data. On the first successful database connection the application creates or updates the six accounts and records provisioning events. A revision marker makes this idempotent: subsequent requests do not overwrite later password or account-status changes. Rotating the configuration deliberately updates these accounts and revokes earlier sessions. The setting never bypasses a missing database or normal authentication.
 
 The audit page records successful, failed and blocked sign-ins with the selected portal, account role and request context, plus portal account creation and credential rotation. Passwords, hashes and bearer tokens are excluded from audit descriptions and authentication responses. History is retained and the current filtered view can be exported as CSV.
+
+
+### Local student and parent review data
+
+When a shared review configuration is present, the local JSON demo seeds a fictional Iyer family with two linked students, 20 attendance entries per student, four subject results, four assignments, weekday schedules and four assessment formats (quiz, written response, code and file upload). Records are labeled as demonstration data in the student and parent dashboards. Existing academic profiles are preserved and repeated startup does not reset edited records. This seeder refuses to run in production, on Vercel, or with any PostgreSQL connection.
+
+Scholaxys workspaces use a midnight navy and electric lime palette with a light theme toggle. Existing route paths, environment names, database identifiers and authentication storage keys remain compatible with prior installations. Staff retains its dedicated `/staff/login` page; the administration sign-in no longer switches roles.

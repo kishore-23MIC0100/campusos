@@ -24,7 +24,7 @@ router.get('/summary', authMiddleware, (_req, res) => {
       activeAnnouncements: db.prepare('SELECT count(*) FROM announcements').get().count,
       academicHealthScore: performance.length ? Number((performance.reduce((sum, record) => sum + Number(record.marks_obtained) / Number(record.max_marks) * 100, 0) / performance.length).toFixed(1)) : null,
     },
-    institution: { name: school?.name || 'CampusOS', affiliation: school?.affiliation_no || null, academicYear: school?.academic_year || null, reportGeneratedAt: new Date().toISOString() },
+    institution: { name: school?.name || 'Scholaxys', affiliation: school?.affiliation_no || null, academicYear: school?.academic_year || null, reportGeneratedAt: new Date().toISOString() },
   });
 });
 export default router;

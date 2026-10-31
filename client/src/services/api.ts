@@ -202,7 +202,7 @@ async function apiFetch<T>(
     throw new ApiError(
       timeout.signal.aborted
         ? "The request timed out. Check your connection and try again."
-        : "Unable to reach CampusOS. Check your connection and try again.",
+        : "Unable to reach Scholaxys. Check your connection and try again.",
     );
   } finally {
     clearTimeout(timeoutId);

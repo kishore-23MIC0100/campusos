@@ -626,7 +626,7 @@ export const PayrollPage: React.FC = () => {
             )}
 
             <div className="pt-6 mt-4 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400">
-              <span>This is a system-generated salary voucher authenticated by Oakridge CampusOS.</span>
+              <span>This is a system-generated salary voucher authenticated by Oakridge Scholaxys.</span>
               <span className="font-bold text-slate-600">Finance & Bursary Division</span>
             </div>
           </div>

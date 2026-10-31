@@ -76,7 +76,7 @@ export function AuditLogsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `CampusOS_Audit_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `Scholaxys_Audit_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }

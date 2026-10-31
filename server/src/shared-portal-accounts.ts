@@ -151,7 +151,7 @@ export function applySharedPortalAccounts(
       target.id,
       `${role} portal credentials ${user ? "updated" : "created"} for ${email}. Existing accounts for other users were preserved.`,
       "server",
-      "CampusOS account configuration",
+      "Scholaxys account configuration",
     );
   }
   return counts;

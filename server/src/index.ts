@@ -6,6 +6,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { initDatabase } from './db.js';
 import { seedDatabase } from './seed.js';
 import { readSharedPortalConfig, applySharedPortalAccounts } from './shared-portal-accounts.js';
+import { seedSharedPortalDemo } from './demo-review.js';
 import { getJwtSecret } from './middleware/auth.js';
 import { accessPolicy } from './middleware/access.js';
 import { authRateLimit } from './middleware/rate-limit.js';
@@ -82,7 +83,7 @@ if (process.env.DATABASE_URL || process.env.VERCEL) {
               res.statusCode = 503;
               res.removeHeader('Content-Length');
               res.setHeader('Content-Type', 'application/json; charset=utf-8');
-              return originalEnd(JSON.stringify({ error: 'Could not save CampusOS data. Please retry.', code: 'DATABASE_UNAVAILABLE' }));
+              return originalEnd(JSON.stringify({ error: 'Could not save Scholaxys data. Please retry.', code: 'DATABASE_UNAVAILABLE' }));
             }
             return originalEnd(...args as Parameters<typeof res.end>);
           });
@@ -155,12 +156,14 @@ export async function startServer() {
   if (!process.env.DATABASE_URL) {
     initDatabase();
     if (!production) await seedDatabase();
-    applySharedPortalAccounts(initDatabase(), readSharedPortalConfig());
+    const config = readSharedPortalConfig();
+    applySharedPortalAccounts(initDatabase(), config);
+    if (!production) seedSharedPortalDemo(initDatabase(), config);
   }
   const server = http.createServer(app);
   // Realtime events contain institutional information and require authentication.
   // HTTP refresh remains the production update path until authenticated WS is configured.
-  server.listen(PORT, () => console.log(`CampusOS API listening on http://localhost:${PORT}`));
+  server.listen(PORT, () => console.log(`Scholaxys API listening on http://localhost:${PORT}`));
   return server;
 }
 if (!process.env.VERCEL && process.env.NODE_ENV !== 'test') {

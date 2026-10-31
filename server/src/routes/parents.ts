@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, requireRoles } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -27,7 +27,7 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
 });
 
 // Parent specific route: get linked children data
-router.get('/my-children', authMiddleware, (req: Request, res: Response) => {
+router.get('/my-children', authMiddleware, requireRoles('PARENT'), (req: Request, res: Response) => {
   try {
     const db = getDb();
     const userId = req.user!.id;

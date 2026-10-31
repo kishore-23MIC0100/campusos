@@ -1,16 +1,16 @@
-/* CampusOS public design: teal accent, 16px surfaces, 10px controls.
+/* Scholaxys public design: teal accent, 16px surfaces, 10px controls.
    Layers: base 0, sticky navigation 20, mobile navigation 21. */
-.presentation {
-  --page: #f7f9f7;
-  --surface: #fdfefc;
-  --ink: #152f36;
-  --muted: #5c706f;
-  --line: #dae3df;
-  --accent: #1d7163;
-  --accent-hover: #14574c;
-  --tint: #edf3ee;
-  --model: #e8efe9;
-  --on-accent: #f9fcfa;
+ .presentation {
+  --page: #f4f7f0;
+  --surface: #fcfef9;
+  --ink: #172723;
+  --muted: #596e64;
+  --line: #dae3d6;
+  --accent: #345d17;
+  --accent-hover: #27470f;
+  --tint: #eaf4de;
+  --model: #e8eee2;
+  --on-accent: #f5faee;
   background: var(--page);
   color: var(--ink);
   min-height: 100dvh;
@@ -21,18 +21,19 @@
   isolation: isolate;
 }
 .presentation[data-theme="dark"] {
-  --page: #101d21;
-  --surface: #17282d;
-  --ink: #edf3ef;
-  --muted: #abc0b9;
-  --line: #30444a;
-  --accent: #84c6ae;
-  --accent-hover: #a2d8c2;
-  --tint: #1c3234;
-  --model: #294442;
-  --on-accent: #122823;
+  --page: #0d1421;
+  --surface: #151f2e;
+  --ink: #edf3fb;
+  --muted: #a6b5c9;
+  --line: #2a374a;
+  --accent: #c2f970;
+  --accent-hover: #d3ff93;
+  --tint: #233421;
+  --model: #26352d;
+  --on-accent: #15220c;
   color-scheme: dark;
 }
+.presentation .brand-wordmark-accent { color: var(--accent); }
 .presentation * {
   box-sizing: border-box;
 }

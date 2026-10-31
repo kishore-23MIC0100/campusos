@@ -49,7 +49,7 @@ export const PortalGateway = () => {
       </header>
       <main className="gateway-main page-width" id="gateway-main">
         <div className="gateway-intro">
-          <span className="section-label">Your CampusOS workspace</span>
+          <span className="section-label">Your Scholaxys workspace</span>
           <h1>
             A place for
             <br />
@@ -116,7 +116,7 @@ export const PortalGateway = () => {
         </div>
       </main>
       <footer className="auth-footer page-width">
-        <span>© {new Date().getFullYear()} CampusOS</span>
+        <span>© {new Date().getFullYear()} Scholaxys</span>
         <span>One campus. Every possibility.</span>
       </footer>
     </div>

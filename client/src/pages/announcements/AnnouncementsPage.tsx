@@ -169,7 +169,7 @@ export const AnnouncementsPage: React.FC = () => {
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
               <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" />{anc.author_name} ({anc.author_role})</span>
-              <span className="text-[11px] text-teal-600 font-semibold">CampusOS Broadcast Stream</span>
+              <span className="text-[11px] text-teal-600 font-semibold">Scholaxys Broadcast Stream</span>
             </div>
           </div>
         ))}

@@ -101,7 +101,7 @@ export class PureDatabase {
   private getPool() {
     if (!this.pool) {
       const connectionString = process.env.DATABASE_URL;
-      if (!connectionString) throw new Error('DATABASE_URL is required for the deployed CampusOS API.');
+      if (!connectionString) throw new Error('DATABASE_URL is required for the deployed Scholaxys API.');
       this.pool = new Pool({
         connectionString,
         ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: true },
@@ -120,7 +120,7 @@ export class PureDatabase {
    */
   public async beginRequest(): Promise<(commit?: boolean) => Promise<void>> {
     if (!this.usesPostgres) {
-      if (process.env.VERCEL) throw new Error('DATABASE_URL is required for the deployed CampusOS API.');
+      if (process.env.VERCEL) throw new Error('DATABASE_URL is required for the deployed Scholaxys API.');
       return async () => {};
     }
 
@@ -195,7 +195,7 @@ export class PureDatabase {
         return { ...defaultState, ...JSON.parse(raw) };
       }
     } catch (err) {
-      throw new Error('Cannot read the CampusOS database. Restore the data file before starting.', { cause: err });
+      throw new Error('Cannot read the Scholaxys database. Restore the data file before starting.', { cause: err });
     }
     return JSON.parse(JSON.stringify(defaultState));
   }
@@ -213,7 +213,7 @@ export class PureDatabase {
       fs.writeFileSync(temporaryPath, JSON.stringify(this.data, null, 2), { encoding: 'utf-8', mode: 0o600 });
       fs.renameSync(temporaryPath, this.filePath);
     } catch (err) {
-      throw new Error('Cannot persist the CampusOS database.', { cause: err });
+      throw new Error('Cannot persist the Scholaxys database.', { cause: err });
     }
   }
 

@@ -191,7 +191,7 @@ router.post('/register', async (req: Request, res: Response) => {
       studentId || (role === 'STUDENT' ? `STU-${Date.now().toString().slice(-4)}` : null),
       studentId ? `ADM-${Date.now().toString().slice(-4)}` : null,
       gradeSection || null,
-      notes || 'Self-service access request submitted via CampusOS Portal'
+      notes || 'Self-service access request submitted via Scholaxys Portal'
     );
 
     // Create notification for admin
