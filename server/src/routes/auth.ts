@@ -51,7 +51,17 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Please enter your login identifier and password.' });
     }
 
-    if ((process.env.NODE_ENV === 'production' || process.env.VERCEL) && ['Admin@2026', 'Teacher@2026', 'Student@2026', 'Parent@2026', 'Pending@2026', 'StaffDemo!2026'].includes(password)) return res.status(401).json({ error: 'Development credentials cannot be used in production. Contact your campus administrator for a secure account.' });
+    const supportedPortals = ['SUPER_ADMIN','SCHOOL_ADMIN','TEACHER','STAFF','STUDENT','PARENT','ANY'];
+    if (expectedRole !== undefined && (typeof expectedRole !== 'string' || !supportedPortals.includes(expectedRole))) return res.status(400).json({ error: 'Choose a supported sign-in portal.' });
+    const portal = expectedRole && expectedRole !== 'ANY' ? expectedRole : 'GENERAL';
+    const auditAttempt = (action: string, description: string, user?: any) => logAudit(user?.id || null,
+      user?.full_name || identifier.trim().toLowerCase().replace(/[\r\n\t]/g, ' '), user?.role || portal, action, 'AUTH', user?.id || null,
+      `${portal} portal: ${description} Account: ${user?.email || identifier.trim().toLowerCase().replace(/[\r\n\t]/g, ' ')}.`, req.ip || 'unknown', String(req.get('user-agent') || 'Unknown browser').slice(0, 500));
+
+    if ((process.env.NODE_ENV === 'production' || process.env.VERCEL) && ['Admin@2026', 'Teacher@2026', 'Student@2026', 'Parent@2026', 'Pending@2026', 'StaffDemo!2026'].includes(password)) {
+      auditAttempt('LOGIN_BLOCKED', 'Development credentials were rejected in production.');
+      return res.status(401).json({ error: 'Development credentials cannot be used in production. Contact your campus administrator for a secure account.' });
+    }
     const db = getDb();
     const cleanId = identifier.trim().toLowerCase();
 
@@ -70,6 +80,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const roleCandidates = requestedRole
       ? requestedRole === 'SUPER_ADMIN'
         ? matchingUsers.filter((candidate) => candidate.role === 'SUPER_ADMIN' || candidate.role === 'SCHOOL_ADMIN')
+          .sort((left, right) => Number(right.role === 'SUPER_ADMIN') - Number(left.role === 'SUPER_ADMIN'))
         : matchingUsers.filter((candidate) => candidate.role === requestedRole)
       : matchingUsers;
     let user: any = null;
@@ -81,10 +92,12 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     if (!user) {
+      auditAttempt('LOGIN_FAILED', 'Sign-in rejected because the credentials did not match an account in this portal.');
       return res.status(401).json({ error: 'Invalid login credentials. Please verify your ID and try again.' });
     }
 
     if (user.status !== 'APPROVED') {
+      auditAttempt('LOGIN_BLOCKED', `Sign-in rejected because the account status is ${user.status}.`, user);
       return res.status(403).json({ error: user.status === 'PENDING' ? 'Your access request is awaiting administrator approval.' : 'This account is not active. Contact your campus administrator.', status: user.status });
     }
 
@@ -94,7 +107,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const token = generateToken(user);
 
-    logAudit(user.id, user.full_name, user.role, 'LOGIN_SUCCESS', 'AUTH', user.id, `Successful login from ${req.ip || '127.0.0.1'}`);
+    auditAttempt('LOGIN_SUCCESS', `Signed in with the ${user.role} account.`, user);
 
     const teacherData = user.role === 'TEACHER' ? getTeacherAllotments(user.id, db) : null;
 

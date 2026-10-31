@@ -615,7 +615,9 @@ export const api = {
     limit?: number;
   }) {
     const query = buildQuery(params);
-    return apiFetch<{ logs: any[] }>(`/audit-logs?${query}`);
+    return apiFetch<{ logs: any[]; total: number; actions: string[] }>(
+      `/audit-logs?${query}`,
+    );
   },
 
   // Notifications

@@ -5,6 +5,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { initDatabase } from './db.js';
 import { seedDatabase } from './seed.js';
+import { readSharedPortalConfig, applySharedPortalAccounts } from './shared-portal-accounts.js';
 import { getJwtSecret } from './middleware/auth.js';
 import { accessPolicy } from './middleware/access.js';
 import { authRateLimit } from './middleware/rate-limit.js';
@@ -60,6 +61,7 @@ if (process.env.DATABASE_URL || process.env.VERCEL) {
     let finishRequest: ((commit?: boolean) => Promise<void>) | null = null;
     try {
       finishRequest = await db.beginRequest();
+      applySharedPortalAccounts(db, readSharedPortalConfig());
       if (!production && process.env.ENABLE_DEMO_SEED === 'true' && !db.hasUsers()) await seedDatabase();
       if (!db.prepare('SELECT id FROM roles WHERE name = ?').get('STAFF')) {
         db.prepare('INSERT INTO roles (id, name, description, is_system) VALUES (?, ?, ?, ?)')
@@ -153,6 +155,7 @@ export async function startServer() {
   if (!process.env.DATABASE_URL) {
     initDatabase();
     if (!production) await seedDatabase();
+    applySharedPortalAccounts(initDatabase(), readSharedPortalConfig());
   }
   const server = http.createServer(app);
   // Realtime events contain institutional information and require authentication.

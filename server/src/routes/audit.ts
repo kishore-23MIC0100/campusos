@@ -30,9 +30,12 @@ router.get('/', authMiddleware, requireRoles('SUPER_ADMIN', 'SCHOOL_ADMIN'), (re
     query += ' ORDER BY created_at DESC';
 
     const logs = db.prepare(query).all(...params);
-    const maxItems = limit ? parseInt(String(limit), 10) : 100;
+    const requestedLimit = limit === undefined ? 100 : Number(limit);
+    if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 500) return res.status(400).json({ error: 'Log limit must be an integer between 1 and 500.' });
+    const maxItems = requestedLimit;
+    const actions = [...new Set(db.prepare('SELECT action FROM audit_logs').all().map(log => String(log.action)))].sort();
 
-    return res.json({ logs: logs.slice(0, maxItems) });
+    return res.json({ logs: logs.slice(0, maxItems), total: logs.length, actions });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to fetch audit logs.' });
   }

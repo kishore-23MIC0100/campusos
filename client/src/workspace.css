@@ -2672,3 +2672,23 @@
     font-size: 11px;
   }
 }
+
+.audit-log-table .audit-description {
+  min-width: 280px;
+  max-width: 430px;
+  white-space: normal;
+  line-height: 1.7;
+}
+.audit-log-table .audit-user-agent {
+  max-width: 210px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.audit-log-table td {
+  vertical-align: top;
+}
+.audit-log-table td:first-child {
+  font-variant-numeric: tabular-nums;
+}
