@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import { getDb } from '../db.js';
 import { authMiddleware, logAudit } from '../middleware/auth.js';
 
@@ -13,15 +14,9 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
     let query = 'SELECT * FROM leave_requests WHERE 1=1';
     const params: any[] = [];
 
-    // Only administrators review the institution-wide queue. Every other role
-    // sees its own requests, so staff and faculty can track their applications.
-    if (!['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user!.role) && req.user!.role !== 'PARENT') {
-      query += ' AND (applicant_id = ? OR applicant_name LIKE ?)';
-      params.push(req.user!.id, `%${req.user!.fullName}%`);
-    } else if (req.user!.role === 'PARENT') {
-      // Show child leaves or parent leaves
-      query += ' AND (applicant_id = ? OR applicant_name LIKE ?)';
-      params.push(req.user!.id, `%Patel%`); // Matches children or user
+    if (!['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user!.role)) {
+      query += ' AND applicant_id = ?';
+      params.push(req.user!.id);
     }
 
     if (status && status !== 'ALL') {
@@ -71,7 +66,11 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
     }
 
     const db = getDb();
-    const id = `lv_${Date.now()}`;
+    const start = Date.parse(fromDate); const end = Date.parse(toDate);
+    if (typeof leaveType !== 'string' || typeof reason !== 'string' || reason.trim().length < 3 || reason.length > 2000 || !/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate) || !Number.isFinite(start) || !Number.isFinite(end) || end < start) return res.status(400).json({ error: 'Enter valid leave dates and a reason between 3 and 2000 characters.' });
+    const days = Math.round((end - start) / 86400000) + 1;
+    if (days > 366) return res.status(400).json({ error: 'Leave requests cannot exceed one year.' });
+    const id = `lv_${randomUUID()}`;
 
     db.prepare(`
       INSERT INTO leave_requests (
@@ -85,7 +84,7 @@ router.post('/', authMiddleware, (req: Request, res: Response) => {
       leaveType.toUpperCase(),
       fromDate,
       toDate,
-      totalDays || 1,
+      days,
       reason.trim(),
       isEmergency ? 1 : 0,
       'PENDING'
@@ -138,6 +137,7 @@ router.put('/:id/approve', authMiddleware, (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Leave request not found.' });
     }
 
+    if (leave.status !== 'PENDING') return res.status(409).json({ error: 'This leave request has already been reviewed.' });
     db.prepare(`
       UPDATE leave_requests 
       SET status = 'APPROVED', reviewed_by = ?, reviewer_remarks = ?, updated_at = CURRENT_TIMESTAMP 
@@ -187,6 +187,7 @@ router.put('/:id/reject', authMiddleware, (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Leave request not found.' });
     }
 
+    if (leave.status !== 'PENDING') return res.status(409).json({ error: 'This leave request has already been reviewed.' });
     db.prepare(`
       UPDATE leave_requests 
       SET status = 'REJECTED', reviewed_by = ?, reviewer_remarks = ?, updated_at = CURRENT_TIMESTAMP 

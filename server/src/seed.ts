@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { getDb } from './db.js';
 
 export async function seedDatabase() {
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) throw new Error('Demo data cannot be seeded in production. Use provision:user for real accounts.');
   const db = getDb();
 
   // Check if users already exist
@@ -9,6 +10,8 @@ export async function seedDatabase() {
   if (existingUsers.count > 0) {
     console.log('[Seed] Database users present. Checking new module tables...');
     seedNewModules(db);
+    await seedDemoStaff(db);
+  seedSupportTeams(db);
     return;
   }
 
@@ -483,6 +486,7 @@ export async function seedDatabase() {
   insertAnnouncement.run(
     'anc_1',
     'Mid-Term Assessment Schedule & Digital Hall Tickets Released',
+    'Review the assessment schedule in your student workspace and contact your class teacher with any timetable conflicts.',
     'ACADEMIC',
     'IMPORTANT',
     'ALL',
@@ -497,6 +501,7 @@ export async function seedDatabase() {
   insertAnnouncement.run(
     'anc_2',
     'Campus Transit Route 7 & Route 12 Timing Optimization',
+    'Families using routes 7 and 12 should check the transport workspace for revised pickup times and contact the transport office with questions.',
     'TRANSPORT',
     'NORMAL',
     'PARENTS',
@@ -511,6 +516,7 @@ export async function seedDatabase() {
   insertAnnouncement.run(
     'anc_3',
     'Parent-Teacher Partnership Conclave Registration Open',
+    'Parents are invited to register for the upcoming partnership meeting through the campus events calendar.',
     'GENERAL',
     'IMPORTANT',
     'PARENTS',
@@ -655,6 +661,8 @@ export async function seedDatabase() {
   insertFacility.run('fac_5', 'MED-01', 'Wellness & First Aid Wing', 1, 'MEDICAL', 12, 'Defibrillator, Oxygen Concentrator, Nurse Triage Station', 'AVAILABLE');
 
   seedNewModules(db);
+  await seedDemoStaff(db);
+  seedSupportTeams(db);
   console.log('[Seed] Oakridge International School seed data populated successfully.');
 }
 
@@ -1417,5 +1425,39 @@ export function seedNewModules(db: any) {
     ];
   }
 
+  db.scheduleSave();
+}
+
+// This account is deliberately restricted to non-production development data.
+async function seedDemoStaff(db: any) {
+  if (db.prepare('SELECT id FROM users WHERE username = ?').get('staff.operations')) return;
+  const password = process.env.CAMPUSOS_DEMO_STAFF_PASSWORD || 'StaffDemo!2026';
+  const passwordHash = await bcrypt.hash(password, 12);
+  db.prepare('INSERT INTO users (id, email, username, password_hash, role, full_name, status, department) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('usr_demo_staff', 'staff@campusos.local', 'staff.operations', passwordHash, 'STAFF', 'Campus Operations', 'APPROVED', 'Operations');
+}
+
+// Illustrative team records are generated only by the non-production demo seed.
+function seedSupportTeams(db: any) {
+  const categories = [
+    ['TECHNICIAN', 'Kavin Raj', 'Technical services', 'Campus Technician'],
+    ['IT_SUPPORT', 'Nisha Menon', 'Information technology', 'IT Support Engineer'],
+    ['LAB_SUPPORT', 'Farhan Ali', 'Science laboratories', 'Laboratory Assistant'],
+    ['MAINTENANCE', 'Manoj Kumar', 'Facilities', 'Maintenance Supervisor'],
+    ['HOUSEKEEPING', 'Latha Devi', 'Campus services', 'Housekeeping Supervisor'],
+    ['SECURITY', 'Vikram Singh', 'Campus safety', 'Security Officer'],
+    ['TRANSPORT', 'Suresh Babu', 'Transport', 'Transport Coordinator'],
+    ['OFFICE', 'Meera Krishnan', 'School office', 'Office Administrator'],
+    ['LIBRARY', 'Anitha Joseph', 'Library', 'Library Assistant'],
+    ['HEALTHCARE', 'Roshni Thomas', 'Health centre', 'School Nurse'],
+  ];
+  for (const [category, name, department, designation] of categories) {
+    const id = `demo_team_${category.toLowerCase()}`;
+    if (db.data.staff_details.some((staff: any) => staff.id === id)) continue;
+    db.data.staff_details.push({ id, employee_id: `DEMO-${category}`, full_name: name,
+      email: `${category.toLowerCase()}@campusos.local`, phone: null, role: 'STAFF',
+      staff_category: category, designation, department, status: 'ACTIVE',
+      employment_type: 'Full-Time', base_salary: 0, created_at: new Date().toISOString() });
+  }
   db.scheduleSave();
 }

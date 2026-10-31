@@ -1,552 +1,680 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { api } from '../../services/api';
-import { BrandLogo } from '../brand/BrandLogo';
-import { NotificationCenter } from '../notifications/NotificationCenter';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { api, type User } from "../../services/api";
+import { BrandLogo } from "../brand/BrandLogo";
 import {
-  Shield, LayoutDashboard, Users, GraduationCap, HeartHandshake, CheckSquare,
-  CalendarDays, BookOpen, Clock, Calendar, Megaphone, Sparkles, TrendingUp,
-  Building2, FileText, Settings, Key, ShieldAlert, LogOut, Search, Bell,
-  Menu, X, ChevronDown, CheckCircle, ArrowUpRight, Compass, Sparkle, RefreshCw,
-  DollarSign, Bus, Award, Briefcase, Command, Zap, ChevronRight
-} from 'lucide-react';
+  LayoutDashboard,
+  Users,
+  GraduationCap,
+  HeartHandshake,
+  CheckSquare,
+  CalendarDays,
+  BookOpen,
+  Clock,
+  Calendar,
+  Megaphone,
+  Sparkles,
+  TrendingUp,
+  Building2,
+  FileText,
+  Settings,
+  KeyRound,
+  ShieldCheck,
+  LogOut,
+  Search,
+  Bell,
+  Menu,
+  X,
+  ArrowUpRight,
+  Bus,
+  Award,
+  Briefcase,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ChevronRight,
+  Check,
+} from "lucide-react";
+import "../../workspace.css";
 
-interface AppLayoutProps {
-  children: React.ReactNode;
+type NavItem = {
+  label: string;
+  path: string;
+  icon: typeof Users;
+  roles?: User["role"][];
+};
+const admins: User["role"][] = ["SUPER_ADMIN", "SCHOOL_ADMIN"];
+const faculty: User["role"][] = [...admins, "TEACHER"];
+const academic: User["role"][] = [...faculty, "STUDENT", "PARENT"];
+
+function navigation(role?: User["role"]) {
+  const groups: { label: string; items: NavItem[] }[] = [
+    {
+      label: "Workspace",
+      items: [
+        { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+      ],
+    },
+    {
+      label: "People",
+      items: [
+        { label: "Students", path: "/students", icon: Users, roles: faculty },
+        {
+          label: "Faculty",
+          path: "/teachers",
+          icon: GraduationCap,
+          roles: faculty,
+        },
+        {
+          label: "Staff & HR",
+          path: "/staff-management",
+          icon: Briefcase,
+          roles: admins,
+        },
+        {
+          label: "Parents",
+          path: "/parents",
+          icon: HeartHandshake,
+          roles: faculty,
+        },
+      ],
+    },
+    {
+      label: "Academics",
+      items: [
+        {
+          label: "Attendance",
+          path: "/attendance",
+          icon: CheckSquare,
+          roles: academic,
+        },
+        {
+          label: "Homework",
+          path: "/homework",
+          icon: BookOpen,
+          roles: academic,
+        },
+        {
+          label: "Assessments",
+          path: role === "STUDENT" ? "/assessment-portal" : "/assessments",
+          icon: Award,
+          roles: academic,
+        },
+        {
+          label: "Timetable",
+          path: "/timetable",
+          icon: Clock,
+          roles: academic,
+        },
+        {
+          label: "Performance",
+          path: "/performance",
+          icon: TrendingUp,
+          roles: academic,
+        },
+      ],
+    },
+    {
+      label: "Campus",
+      items: [
+        {
+          label: "Staff teams",
+          path: "/staff-services",
+          icon: Users,
+          roles: [...faculty, "STAFF"],
+        },
+        { label: "Transport", path: "/transport", icon: Bus },
+        { label: "Leave", path: "/leave", icon: CalendarDays },
+        { label: "Events", path: "/events", icon: Calendar },
+        { label: "Announcements", path: "/announcements", icon: Megaphone },
+        {
+          label: "Spotlight",
+          path: "/spotlight",
+          icon: Sparkles,
+          roles: academic,
+        },
+      ],
+    },
+    {
+      label: "Administration",
+      items: [
+        {
+          label: "School Mgmt",
+          path: "/school-management",
+          icon: Building2,
+          roles: admins,
+        },
+        { label: "Reports", path: "/reports", icon: FileText, roles: faculty },
+        { label: "Payroll", path: "/payroll", icon: Briefcase, roles: admins },
+        {
+          label: "Users & Access",
+          path: "/admin/users",
+          icon: KeyRound,
+          roles: admins,
+        },
+        {
+          label: "Roles & RBAC",
+          path: "/admin/roles",
+          icon: ShieldCheck,
+          roles: admins,
+        },
+        {
+          label: "Audit Logs",
+          path: "/admin/audit-logs",
+          icon: FileText,
+          roles: admins,
+        },
+      ],
+    },
+  ];
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => !item.roles || Boolean(role && item.roles.includes(role)),
+      ),
+    }))
+    .filter((group) => group.items.length);
 }
 
-export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+type Notification = Awaited<
+  ReturnType<typeof api.getNotifications>
+>["notifications"][number];
+
+export function AppLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const [showNotifMenu, setShowNotifMenu] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
-
-  // Fetch notifications
-  const loadNotifications = async () => {
-    try {
-      const res = await api.getNotifications();
-      setNotifications(res.notifications || []);
-      setUnreadCount(res.unreadCount || 0);
-    } catch {
-      // Quiet fail
-    }
-  };
-
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileViewport, setMobileViewport] = useState(
+    () => window.matchMedia("(max-width: 1023px)").matches,
+  );
   useEffect(() => {
-    loadNotifications();
-    const timer = setInterval(loadNotifications, 15000);
-    return () => clearInterval(timer);
+    const media = window.matchMedia("(max-width: 1023px)");
+    const update = () => {
+      setMobileViewport(media.matches);
+      if (!media.matches) setMobileOpen(false);
+    };
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
   }, []);
+  const [collapsed, setCollapsed] = useState(false);
+  const [query, setQuery] = useState("");
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationError, setNotificationError] = useState("");
+  const [notificationLoading, setNotificationLoading] = useState(true);
+  const commandRef = useRef<HTMLDialogElement>(null);
+  const searchRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const navGroups = useMemo(() => navigation(user?.role), [user?.role]);
+  const allPages = useMemo(
+    () => [
+      ...navGroups.flatMap((group) => group.items),
+      { label: "Settings", path: "/settings", icon: Settings },
+    ],
+    [navGroups],
+  );
+  const currentPage = allPages.find(
+    (item) =>
+      location.pathname === item.path ||
+      location.pathname.startsWith(`${item.path}/`),
+  );
+  const matches = allPages.filter((item) =>
+    item.label.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+  const initials =
+    user?.fullName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((name) => name[0])
+      .join("") || "CO";
+  const roleName =
+    user?.role === "SCHOOL_ADMIN"
+      ? "School administrator"
+      : user?.role === "SUPER_ADMIN"
+        ? "Administrator"
+        : user?.role
+          ? user.role[0] + user.role.slice(1).toLowerCase()
+          : "Campus member";
 
-  // Global CMD+K shortcut
+  async function loadNotifications() {
+    setNotificationError("");
+    try {
+      const result = await api.getNotifications();
+      setNotifications(result.notifications || []);
+      setUnread(result.unreadCount || 0);
+    } catch {
+      setNotificationError(
+        "Notifications could not be loaded. Please try again.",
+      );
+    } finally {
+      setNotificationLoading(false);
+    }
+  }
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowSearchModal((prev) => !prev);
-      }
-      if (e.key === 'Escape') {
-        setShowSearchModal(false);
+    let active = true;
+    const load = async () => {
+      try {
+        const result = await api.getNotifications();
+        if (active) {
+          setNotifications(result.notifications || []);
+          setUnread(result.unreadCount || 0);
+          setNotificationError("");
+        }
+      } catch {
+        if (active)
+          setNotificationError(
+            "Notifications could not be loaded. Please try again.",
+          );
+      } finally {
+        if (active) setNotificationLoading(false);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    void load();
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void load();
+    }, 60000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        if (commandRef.current?.open) commandRef.current.close();
+        else commandRef.current?.showModal();
+      }
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+        setNotificationOpen(false);
+      }
+    };
+    window.addEventListener("keydown", keydown);
+    return () => window.removeEventListener("keydown", keydown);
   }, []);
 
-  // Search execution
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
+    setMobileOpen(false);
+    setNotificationOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    drawerRef.current
+      ?.querySelector<HTMLButtonElement>(".workspace-close")
+      ?.focus();
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const elements = drawerRef.current?.querySelectorAll<HTMLElement>(
+        "a[href], button:not([disabled])",
+      );
+      if (!elements?.length) return;
+      const first = elements[0],
+        last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", trapFocus);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", trapFocus);
+      previous?.focus();
+    };
+  }, [mobileOpen]);
+
+  async function readNotification(item: Notification) {
+    try {
+      if (!item.is_read) await api.markNotificationRead(item.id);
+      await loadNotifications();
+      const safeLink =
+        typeof item.link === "string" &&
+        item.link.startsWith("/") &&
+        !item.link.startsWith("//");
+      if (safeLink) {
+        setNotificationOpen(false);
+        navigate(item.link);
+      }
+    } catch {
+      setNotificationError(
+        "We could not update this notification. Please try again.",
+      );
     }
-    const q = searchQuery.toLowerCase();
-    const sampleResults = [
-      { type: 'Student', title: 'Arav Patel (Grade 10A)', link: '/students/stu_1', desc: 'Roll #14 • GPA 3.92', icon: Users },
-      { type: 'Student', title: 'Diya Patel (Grade 7A)', link: '/students/stu_2', desc: 'Roll #09 • GPA 3.88', icon: Users },
-      { type: 'Teacher', title: 'Mrs. Priya Nair', link: '/teachers/tch_1', desc: 'Mathematics Faculty', icon: GraduationCap },
-      { type: 'Teacher', title: 'Dr. Marcus Vance', link: '/teachers/tch_2', desc: 'Physics Department Head', icon: GraduationCap },
-      { type: 'Homework', title: 'Calculus Optimization', link: '/homework', desc: 'Grade 10A • Due Sept 15', icon: BookOpen },
-      { type: 'Event', title: 'Annual STEM Summit 2026', link: '/events', desc: 'Oct 15 • Grand Auditorium', icon: Calendar },
-      { type: 'Announcement', title: 'Mid-Term Hall Tickets', link: '/announcements', desc: 'Published by Principal', icon: Megaphone },
-      { type: 'Module', title: 'Attendance Taker', link: '/attendance', desc: 'Daily Class Roster', icon: CheckSquare },
-      { type: 'Module', title: 'Payroll & Salaries', link: '/payroll', desc: 'Staff Salary Disbursements & Payslips', icon: DollarSign },
-      { type: 'Module', title: 'Staff & Personnel Directory', link: '/staff-management', desc: 'Faculty Credentials & HR Dossiers', icon: Briefcase },
-      { type: 'Module', title: 'Subject Assessments Portal', link: user?.role === 'STUDENT' ? '/assessment-portal' : '/assessments', desc: 'Unit Tests, Lab Practicals & Marks', icon: Award },
-      { type: 'Module', title: 'Campus Transportation', link: '/transport', desc: 'GPS Fleet, Bus Routes & Stops', icon: Bus },
-      { type: 'Module', title: 'Timetable Builder', link: '/timetable', desc: 'Weekly Schedule Grid', icon: Clock },
-      { type: 'Module', title: 'Leave Approvals', link: '/leave', desc: 'Pending Requests', icon: CalendarDays },
-    ].filter((item) => item.title.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q) || item.type.toLowerCase().includes(q));
-
-    setSearchResults(sampleResults);
-  }, [searchQuery]);
-
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN';
-
-  const navGroups = [
-    {
-      label: 'Overview',
-      items: [
-        { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['ALL', 'STAFF'] },
-      ]
-    },
-    {
-      label: 'People',
-      items: [
-        { label: 'Students', icon: Users, path: '/students', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
-        { label: 'Faculty', icon: GraduationCap, path: '/teachers', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
-        { label: 'Staff & HR', icon: Briefcase, path: '/staff-management', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
-        { label: 'Parents', icon: HeartHandshake, path: '/parents', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
-      ]
-    },
-    {
-      label: 'Academics',
-      items: [
-        { label: 'Attendance', icon: CheckSquare, path: '/attendance', roles: ['ALL'] },
-        { label: 'Homework', icon: BookOpen, path: '/homework', roles: ['ALL'] },
-        { label: 'Assessments', icon: Award, path: user?.role === 'STUDENT' ? '/assessment-portal' : '/assessments', roles: ['ALL'] },
-        { label: 'Timetable', icon: Clock, path: '/timetable', roles: ['ALL'] },
-        { label: 'Performance', icon: TrendingUp, path: '/performance', roles: ['ALL'] },
-      ]
-    },
-    {
-      label: 'Operations',
-      items: [
-        { label: 'Payroll', icon: DollarSign, path: '/payroll', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
-        { label: 'Transport', icon: Bus, path: '/transport', roles: ['ALL', 'STAFF'] },
-        { label: 'Leave', icon: CalendarDays, path: '/leave', roles: ['ALL', 'STAFF'] },
-      ]
-    },
-    {
-      label: 'Community',
-      items: [
-        { label: 'Events', icon: Calendar, path: '/events', roles: ['ALL', 'STAFF'] },
-        { label: 'Announcements', icon: Megaphone, path: '/announcements', roles: ['ALL', 'STAFF'] },
-        { label: 'Spotlight', icon: Sparkles, path: '/spotlight', roles: ['ALL'] },
-      ]
-    },
-    {
-      label: 'Administration',
-      items: [
-        { label: 'School Mgmt', icon: Building2, path: '/school-management', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
-        { label: 'Reports', icon: FileText, path: '/reports', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
-      ]
-    }
-  ];
-
-  const adminNavItems = [
-    { label: 'Users & Access', icon: Key, path: '/admin/users' },
-    { label: 'Roles & RBAC', icon: Shield, path: '/admin/roles' },
-    { label: 'Audit Logs', icon: ShieldAlert, path: '/admin/audit-logs' },
-  ];
-
-  const sidebarWidth = sidebarCollapsed ? 'w-[72px]' : 'w-64';
-
-  const getRoleBadgeColor = (role?: string) => {
-    switch (role) {
-      case 'SUPER_ADMIN':
-      case 'SCHOOL_ADMIN': return 'from-iris-600 to-iris-500';
-      case 'TEACHER': return 'from-cyan-600 to-cyan-500';
-      case 'STUDENT': return 'from-emerald-600 to-emerald-500';
-      case 'PARENT': return 'from-amber-600 to-amber-500';
-      default: return 'from-slate-600 to-slate-500';
-    }
-  };
+  }
 
   return (
-    <div className="campus-app-shell min-h-screen bg-slate-950 text-slate-100 flex font-sans">
-      {/* Aurora background */}
-      <div className="aurora-bg" />
-      <div className="mesh-grid" />
-
-      {/* SIDEBAR NAVIGATION */}
+    <div
+      className={`workspace-shell ${collapsed ? "workspace-collapsed" : ""}`}
+    >
+      <a className="workspace-skip" href="#workspace-content">
+        Skip to content
+      </a>
+      {mobileOpen && (
+        <button
+          className="workspace-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
       <aside
-        className={`campus-app-sidebar fixed inset-y-0 left-0 z-40 ${sidebarWidth} flex flex-col justify-between transition-all duration-300 ease-out lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-        style={{
-          background: 'linear-gradient(180deg, rgba(2, 6, 23, 0.95) 0%, rgba(15, 23, 42, 0.9) 100%)',
-          backdropFilter: 'blur(24px) saturate(1.5)',
-          borderRight: '1px solid rgba(148, 163, 184, 0.08)',
-        }}
+        ref={drawerRef}
+        inert={mobileViewport && !mobileOpen}
+        aria-hidden={mobileViewport && !mobileOpen ? true : undefined}
+        className={`workspace-sidebar ${mobileOpen ? "is-open" : ""}`}
+        aria-label="Main navigation"
+        role={mobileOpen ? "dialog" : undefined}
+        aria-modal={mobileOpen || undefined}
       >
-        <div className="flex flex-col h-full">
-          {/* Brand Header */}
-          <div className="p-4 border-b border-slate-800/50 flex items-center justify-between">
-            {!sidebarCollapsed && (
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-iris-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-iris-600/20">
-                  <Zap className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-white font-display tracking-tight">CampusOS</div>
-                  <div className="text-[9px] font-bold text-iris-400 uppercase tracking-widest">Smart ERP</div>
-                </div>
-              </div>
-            )}
-            {sidebarCollapsed && (
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-iris-600 to-cyan-500 flex items-center justify-center mx-auto shadow-lg shadow-iris-600/20">
-                <Zap className="w-4 h-4 text-white" />
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/60 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* User Profile Badge */}
-          {!sidebarCollapsed && (
-            <div className="mx-3 mt-3 mb-2 p-3 rounded-xl" style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(148, 163, 184, 0.06)' }}>
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <img
-                    src={user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
-                    alt={user?.fullName || 'User'}
-                    className="w-9 h-9 rounded-xl object-cover ring-2 ring-iris-500/20"
-                  />
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-white truncate">{user?.fullName || 'User'}</div>
-                  <div className={`text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r ${getRoleBadgeColor(user?.role)} bg-clip-text text-transparent`}>
-                    {user?.role?.replace('_', ' ')}
-                  </div>
-                </div>
-              </div>
+        <div className="workspace-brand">
+          <BrandLogo
+            size="sm"
+            showSubtitle={false}
+            showBadge={false}
+            variant="light"
+            to="/dashboard"
+            className={collapsed ? "workspace-logo-collapsed" : ""}
+          />
+          <button
+            type="button"
+            className="workspace-icon-button workspace-close"
+            aria-label="Close navigation"
+            onClick={() => setMobileOpen(false)}
+          >
+            <X size={19} />
+          </button>
+        </div>
+        {!collapsed && (
+          <div className="workspace-school">
+            <span className="workspace-school-icon">
+              <Building2 size={19} />
+            </span>
+            <div>
+              <strong>Campus workspace</strong>
+              <span>{roleName}</span>
             </div>
-          )}
-
-          {/* Navigation Items */}
-          <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-            {navGroups.map((group) => {
-              const filteredItems = group.items.filter((item) =>
-                (item.roles.includes('ALL') && user?.role !== 'STAFF') || Boolean(user && item.roles.includes(user.role))
-              );
-              if (filteredItems.length === 0) return null;
-
-              return (
-                <div key={group.label} className="mb-1">
-                  {!sidebarCollapsed && (
-                    <div className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-slate-600 px-3 pt-3 pb-1.5">
-                      {group.label}
-                    </div>
-                  )}
-                  {filteredItems.map((item) => {
-                    const isActive = location.pathname === item.path;
-                    const isHovered = hoveredNav === item.path;
-                    return (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        onClick={() => setSidebarOpen(false)}
-                        onMouseEnter={() => setHoveredNav(item.path)}
-                        onMouseLeave={() => setHoveredNav(null)}
-                        className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-200 ${
-                          sidebarCollapsed ? 'justify-center' : ''
-                        } ${
-                          isActive
-                            ? 'text-white'
-                            : 'text-slate-400 hover:text-slate-100'
-                        }`}
-                        title={sidebarCollapsed ? item.label : undefined}
-                      >
-                        {/* Active indicator glow */}
-                        {isActive && (
-                          <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-iris-600/15 to-cyan-600/10 border border-iris-500/20" />
-                        )}
-                        {/* Hover glow */}
-                        {isHovered && !isActive && (
-                          <div className="absolute inset-0 rounded-xl bg-slate-800/40" />
-                        )}
-                        {/* Active left accent */}
-                        {isActive && (
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-iris-500 to-cyan-500" />
-                        )}
-                        <item.icon className={`relative w-4 h-4 flex-shrink-0 ${isActive ? 'text-iris-400' : ''}`} />
-                        {!sidebarCollapsed && <span className="relative truncate">{item.label}</span>}
-                      </Link>
-                    );
-                  })}
-                </div>
-              );
-            })}
-
-            {/* Admin Governance Group */}
-            {isSuperAdmin && (
-              <div className="mb-1">
-                {!sidebarCollapsed && (
-                  <div className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-amber-500/70 px-3 pt-3 pb-1.5 flex items-center gap-1.5">
-                    <Shield className="w-3 h-3" />
-                    Governance
-                  </div>
-                )}
-                {adminNavItems.map((item) => {
-                  const isActive = location.pathname === item.path;
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => setSidebarOpen(false)}
-                      className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-200 ${
-                        sidebarCollapsed ? 'justify-center' : ''
-                      } ${
-                        isActive
-                          ? 'text-amber-300'
-                          : 'text-slate-400 hover:text-slate-100'
-                      }`}
-                      title={sidebarCollapsed ? item.label : undefined}
-                    >
-                      {isActive && (
-                        <div className="absolute inset-0 rounded-xl bg-amber-500/10 border border-amber-500/20" />
-                      )}
-                      {isActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-amber-400 to-amber-600" />
-                      )}
-                      <item.icon className={`relative w-4 h-4 flex-shrink-0 ${isActive ? 'text-amber-400' : ''}`} />
-                      {!sidebarCollapsed && <span className="relative truncate">{item.label}</span>}
-                    </Link>
-                  );
-                })}
+            <ShieldCheck size={16} />
+          </div>
+        )}
+        <nav className="workspace-navigation">
+          {navGroups.map((group) => (
+            <div className="workspace-nav-group" key={group.label}>
+              {!collapsed && <p>{group.label}</p>}
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  title={collapsed ? item.label : undefined}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    `workspace-nav-item ${isActive ? "is-active" : ""}`
+                  }
+                >
+                  <item.icon size={18} strokeWidth={1.7} />
+                  <span>{item.label}</span>
+                  <ChevronRight className="workspace-nav-chevron" size={14} />
+                </NavLink>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div className="workspace-sidebar-bottom">
+          <NavLink
+            className="workspace-nav-item"
+            to="/settings"
+            title="Settings"
+          >
+            <Settings size={18} strokeWidth={1.7} />
+            <span>Settings</span>
+          </NavLink>
+          <button
+            className="workspace-nav-item workspace-collapse"
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? "Expand navigation" : "Collapse navigation"}
+          >
+            {collapsed ? (
+              <PanelLeftOpen size={18} />
+            ) : (
+              <PanelLeftClose size={18} />
+            )}
+            <span>Collapse sidebar</span>
+          </button>
+          <div className="workspace-profile">
+            <span className="workspace-avatar">{initials}</span>
+            {!collapsed && (
+              <div>
+                <strong>{user?.fullName}</strong>
+                <span>{roleName}</span>
               </div>
             )}
-          </div>
-
-          {/* Bottom Actions */}
-          <div className="p-2 border-t border-slate-800/50 space-y-0.5">
-            {/* Collapse toggle (desktop) */}
             <button
-              type="button"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden lg:flex w-full items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold text-slate-500 hover:text-slate-300 hover:bg-slate-800/40 transition-all cursor-pointer"
-            >
-              <ChevronRight className={`w-4 h-4 transition-transform duration-300 ${sidebarCollapsed ? '' : 'rotate-180'}`} />
-              {!sidebarCollapsed && <span>Collapse</span>}
-            </button>
-
-            <Link
-              to="/settings"
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 transition-all ${sidebarCollapsed ? 'justify-center' : ''}`}
-            >
-              <Settings className="w-4 h-4" />
-              {!sidebarCollapsed && <span>Settings</span>}
-            </Link>
-
-            <button
-              type="button"
+              className="workspace-icon-button"
               onClick={() => {
                 logout();
-                navigate('/admin/login');
+                navigate("/login");
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-all text-left cursor-pointer ${sidebarCollapsed ? 'justify-center' : ''}`}
+              title="Sign out"
+              aria-label="Sign out"
             >
-              <LogOut className="w-4 h-4" />
-              {!sidebarCollapsed && <span>Sign Out</span>}
+              <LogOut size={17} />
             </button>
           </div>
         </div>
       </aside>
-
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* MAIN VIEWPORT */}
-      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-64'}`}>
-        {/* Top Navbar */}
-        <header
-          className="campus-app-topbar sticky top-0 z-30 h-14 px-4 sm:px-6 flex items-center justify-between"
-          style={{
-            background: 'rgba(2, 6, 23, 0.7)',
-            backdropFilter: 'blur(20px) saturate(1.5)',
-            borderBottom: '1px solid rgba(148, 163, 184, 0.06)',
-          }}
-        >
-          <div className="flex items-center gap-3">
+      <div className="workspace-main">
+        <header className="workspace-topbar">
+          <div className="workspace-breadcrumb">
             <button
               type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+              className="workspace-icon-button workspace-menu"
+              aria-label="Open navigation"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen(true)}
             >
-              <Menu className="w-5 h-5" />
+              <Menu size={21} />
             </button>
-
-            {/* Command Palette Trigger */}
-            <button
-              type="button"
-              onClick={() => setShowSearchModal(true)}
-              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-iris-300 text-xs font-medium transition-all w-44 sm:w-64 hover:text-iris-100"
-              style={{
-                background: 'rgba(15, 23, 42, 0.7)',
-                border: '1px solid rgba(148, 163, 184, 0.08)',
-              }}
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span className="truncate">Search campus resources...</span>
-              <kbd className="hidden sm:inline-flex items-center gap-0.5 ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded-md text-slate-600 font-semibold"
-                style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(148, 163, 184, 0.1)' }}
-              >
-                <Command className="w-2.5 h-2.5" />K
-              </kbd>
-            </button>
+            <span>Workspace</span>
+            <ChevronRight size={14} />
+            <strong>{currentPage?.label || "Campus"}</strong>
           </div>
-
-          <div className="flex items-center gap-2">
-            {/* Notifications */}
-            <div className="relative">
+          <div className="workspace-topbar-actions">
+            <button
+              ref={searchRef}
+              className="workspace-search-trigger"
+              onClick={() => commandRef.current?.showModal()}
+              aria-label="Search workspace pages"
+            >
+              <Search size={16} />
+              <span>Find a page...</span>
+              <kbd>⌘ K</kbd>
+            </button>
+            <div className="workspace-notification-wrap">
               <button
-                type="button"
-                onClick={() => setShowNotifMenu(!showNotifMenu)}
-                className="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all cursor-pointer group"
-                title="Notifications"
+                className="workspace-icon-button"
+                aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
+                aria-expanded={notificationOpen}
+                onClick={() => setNotificationOpen(!notificationOpen)}
               >
-                <Bell className="w-[18px] h-[18px] group-hover:rotate-12 transition-transform" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full text-[9px] font-extrabold text-white ring-2 ring-slate-950 animate-pulse"
-                    style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)' }}
-                  >
-                    {unreadCount > 9 ? '9+' : unreadCount}
+                <Bell size={19} />
+                {unread > 0 && (
+                  <span className="workspace-notification-count">
+                    {unread > 9 ? "9+" : unread}
                   </span>
                 )}
               </button>
-
-              {showNotifMenu && (
-                <NotificationCenter
-                  notifications={notifications}
-                  unreadCount={unreadCount}
-                  onRefresh={loadNotifications}
-                  onClose={() => setShowNotifMenu(false)}
-                />
+              {notificationOpen && (
+                <section
+                  className="workspace-notifications"
+                  aria-label="Notifications"
+                >
+                  <div className="workspace-notifications-heading">
+                    <h2>Notifications</h2>
+                    <button
+                      className="workspace-icon-button"
+                      aria-label="Close notifications"
+                      onClick={() => setNotificationOpen(false)}
+                    >
+                      <X size={17} />
+                    </button>
+                  </div>
+                  {notificationLoading ? (
+                    <p className="workspace-muted">Loading notifications...</p>
+                  ) : notificationError ? (
+                    <div className="workspace-notification-error">
+                      <p>{notificationError}</p>
+                      <button onClick={loadNotifications}>Try again</button>
+                    </div>
+                  ) : notifications.length ? (
+                    <>
+                      <div className="workspace-notification-list">
+                        {notifications.map((item) => (
+                          <button
+                            key={item.id}
+                            className={`workspace-notification ${item.is_read ? "" : "is-unread"}`}
+                            onClick={() => readNotification(item)}
+                          >
+                            <span className="workspace-notice-icon">
+                              <Bell size={16} />
+                            </span>
+                            <span>
+                              <strong>{item.title}</strong>
+                              <span>{item.message}</span>
+                              <small>
+                                {item.created_at
+                                  ? new Date(
+                                      item.created_at,
+                                    ).toLocaleDateString("en-IN", {
+                                      day: "numeric",
+                                      month: "short",
+                                    })
+                                  : ""}
+                              </small>
+                            </span>
+                            {!item.is_read && (
+                              <span className="workspace-unread-dot" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        className="workspace-read-all"
+                        onClick={async () => {
+                          try {
+                            await api.markAllNotificationsRead();
+                            await loadNotifications();
+                          } catch {
+                            setNotificationError(
+                              "Unable to mark notifications as read. Please try again.",
+                            );
+                          }
+                        }}
+                      >
+                        <Check size={15} /> Mark all as read
+                      </button>
+                    </>
+                  ) : (
+                    <div className="workspace-notification-empty">
+                      <Bell size={25} />
+                      <strong>You're all caught up</strong>
+                      <p>New campus updates will appear here.</p>
+                    </div>
+                  )}
+                </section>
               )}
             </div>
-
-            {/* Landing link */}
-            <Link
-              to="/"
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl text-slate-400 hover:text-white transition-all"
-              style={{
-                background: 'rgba(15, 23, 42, 0.4)',
-                border: '1px solid rgba(148, 163, 184, 0.06)',
-              }}
-            >
-              <Compass className="w-3.5 h-3.5 text-iris-400" />
-              <span className="hidden sm:inline">Campus</span>
+            <Link to="/" className="workspace-campus-link">
+              Campus site <ArrowUpRight size={15} />
             </Link>
+            <span
+              className="workspace-topbar-avatar"
+              aria-label={user?.fullName}
+            >
+              {initials}
+            </span>
           </div>
         </header>
-
-        {/* Content Area */}
-        <main className="campus-app-content flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full relative z-10">
+        <main
+          id="workspace-content"
+          className="workspace-content campus-app-content"
+          tabIndex={-1}
+        >
           {children}
         </main>
+        <footer className="workspace-footer">
+          <span>CampusOS</span>
+          <span>Your campus, connected.</span>
+          <Link to="/settings">
+            Account settings <ArrowUpRight size={12} />
+          </Link>
+        </footer>
       </div>
-
-      {/* COMMAND PALETTE MODAL */}
-      {showSearchModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4"
-          style={{ background: 'rgba(2, 6, 23, 0.7)', backdropFilter: 'blur(8px)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowSearchModal(false); }}
-        >
-          <div
-            className="max-w-2xl w-full rounded-2xl overflow-hidden animate-scaleIn"
-            style={{
-              background: 'rgba(15, 23, 42, 0.9)',
-              backdropFilter: 'blur(40px) saturate(2)',
-              border: '1px solid rgba(148, 163, 184, 0.1)',
-              boxShadow: '0 40px 80px rgba(0, 0, 0, 0.5), 0 0 80px rgba(124, 58, 237, 0.1)',
-            }}
+      <dialog
+        ref={commandRef}
+        className="workspace-command"
+        onClose={() => {
+          setQuery("");
+          searchRef.current?.focus();
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) commandRef.current?.close();
+        }}
+      >
+        <div className="workspace-command-search">
+          <Search size={20} />
+          <input
+            autoFocus
+            aria-label="Search workspace pages"
+            placeholder="Where would you like to go?"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <button
+            className="workspace-icon-button"
+            aria-label="Close search"
+            onClick={() => commandRef.current?.close()}
           >
-            {/* Search Input */}
-            <div className="p-4 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(148, 163, 184, 0.08)' }}>
-              <Search className="w-5 h-5 text-iris-400" />
-              <input
-                type="text"
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search students, faculty, modules..."
-                className="w-full text-sm text-white placeholder:text-slate-500 outline-none font-medium bg-transparent"
-              />
-              <button
-                type="button"
-                onClick={() => setShowSearchModal(false)}
-                className="text-[10px] px-2 py-1 rounded-lg text-slate-400 font-mono font-bold"
-                style={{ background: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(148, 163, 184, 0.1)' }}
-              >
-                ESC
-              </button>
-            </div>
-
-            {/* Results */}
-            <div className="p-2 max-h-[400px] overflow-y-auto">
-              {searchResults.length === 0 ? (
-                <div className="py-12 text-center">
-                  <Search className="w-8 h-8 text-slate-700 mx-auto mb-3" />
-                  <div className="text-sm text-slate-500 font-medium">
-                    {searchQuery ? 'No matching records found' : 'Start typing to search...'}
-                  </div>
-                </div>
-              ) : (
-                searchResults.map((res, i) => (
-                  <Link
-                    key={i}
-                    to={res.link}
-                    onClick={() => setShowSearchModal(false)}
-                    className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-800/50 group transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ background: 'rgba(124, 58, 237, 0.1)', border: '1px solid rgba(124, 58, 237, 0.15)' }}
-                      >
-                        <res.icon className="w-4 h-4 text-iris-400" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-slate-200 group-hover:text-white">{res.title}</div>
-                        <div className="text-xs text-slate-500">{res.desc}</div>
-                      </div>
-                    </div>
-                    <span className="badge badge-iris text-[9px]">{res.type}</span>
-                  </Link>
-                ))
-              )}
-            </div>
-
-            {/* Footer hint */}
-            <div className="px-4 py-2.5 flex items-center justify-between text-[10px] text-slate-600 font-medium"
-              style={{ borderTop: '1px solid rgba(148, 163, 184, 0.06)' }}
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">↑↓</kbd> Navigate
-                </span>
-                <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">↵</kbd> Open
-                </span>
-              </div>
-              <span>CampusOS Spotlight</span>
-            </div>
-          </div>
+            <X size={18} />
+          </button>
         </div>
-      )}
+        <p className="workspace-command-label">
+          {query ? `${matches.length} matching pages` : "Your workspace pages"}
+        </p>
+        <div className="workspace-command-results">
+          {matches.length ? (
+            matches.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => commandRef.current?.close()}
+              >
+                <item.icon size={18} />
+                <span>{item.label}</span>
+                <ArrowUpRight size={15} />
+              </Link>
+            ))
+          ) : (
+            <p className="workspace-command-empty">
+              No pages match “{query}”. Try another name.
+            </p>
+          )}
+        </div>
+        <div className="workspace-command-footer">
+          Only pages available to your account are shown.
+        </div>
+      </dialog>
     </div>
   );
-};
+}

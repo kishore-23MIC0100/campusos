@@ -1,3 +1,4 @@
+import { accessibleStudents, scopeAcademicRecords, canAccessClass } from '../middleware/access.js';
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db.js';
 import { authMiddleware, logAudit } from '../middleware/auth.js';
@@ -26,14 +27,13 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
       query += ' AND date = ?';
       params.push(date);
     }
-    if (studentId) {
-      query += ' AND student_id = ?';
-      params.push(studentId);
-    }
+
 
     query += ' ORDER BY date DESC, roll_no ASC';
 
-    const records = db.prepare(query).all(...params);
+    const requestedStudent = studentId ? db.prepare('SELECT * FROM students WHERE id = ? OR student_id = ?').get(studentId, studentId) : null;
+    const requestedIds = new Set([requestedStudent?.id, requestedStudent?.student_id, requestedStudent?.user_id, studentId].filter(Boolean));
+    const records = scopeAcademicRecords(db.prepare(query).all(...params), req.user!, db).filter(record => !studentId || requestedIds.has(record.student_id));
 
     // Summary calculation
     const present = records.filter((r: any) => r.status === 'PRESENT').length;
@@ -49,7 +49,7 @@ router.get('/', authMiddleware, (req: Request, res: Response) => {
         absent,
         late,
         excused,
-        rate: records.length > 0 ? ((present / records.length) * 100).toFixed(1) : 100,
+        rate: records.length > 0 ? (((present + late) / records.length) * 100).toFixed(1) : null,
       },
     });
   } catch (err: any) {
@@ -92,9 +92,9 @@ router.post('/bulk', authMiddleware, (req: Request, res: Response) => {
     }
     const targetDate = date || new Date().toISOString().split('T')[0];
     const marker = req.user!.fullName;
-
-    // Delete existing records for that date and class to avoid duplicate entries
-    db.prepare('DELETE FROM attendance_records WHERE grade = ? AND section = ? AND date = ?').run(grade, section, targetDate);
+    const roster = db.prepare('SELECT * FROM students WHERE grade = ? AND section = ?').all(grade, section);
+    const rosterIds = new Set(roster.flatMap(student => [student.id, student.student_id]));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate) || Number.isNaN(Date.parse(targetDate)) || records.length > 1000 || new Set(records.map((item: any) => item?.studentId)).size !== records.length || records.some((item: any) => !item || !rosterIds.has(item.studentId) || !['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'].includes(item.status))) return res.status(400).json({ error: 'Use valid dates, unique students in this class, and supported attendance statuses.' });
 
     const insertStmt = db.prepare(`
       INSERT INTO attendance_records (id, date, grade, section, student_id, student_name, roll_no, status, marked_by, remarks)
@@ -102,6 +102,7 @@ router.post('/bulk', authMiddleware, (req: Request, res: Response) => {
     `);
 
     const insertMany = db.transaction((items: any[]) => {
+      db.prepare('DELETE FROM attendance_records WHERE grade = ? AND section = ? AND date = ?').run(grade, section, targetDate);
       for (const item of items) {
         const recordId = `att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         insertStmt.run(
@@ -155,23 +156,17 @@ router.post('/bulk', authMiddleware, (req: Request, res: Response) => {
 router.get('/analytics', authMiddleware, (req: Request, res: Response) => {
   try {
     const db = getDb();
-    const trends = [
-      { date: 'Mon', attendanceRate: 96.2, presentCount: 2380, absentCount: 94 },
-      { date: 'Tue', attendanceRate: 97.4, presentCount: 2410, absentCount: 64 },
-      { date: 'Wed', attendanceRate: 95.8, presentCount: 2370, absentCount: 104 },
-      { date: 'Thu', attendanceRate: 98.1, presentCount: 2430, absentCount: 44 },
-      { date: 'Fri', attendanceRate: 94.6, presentCount: 2345, absentCount: 129 },
-    ];
-
-    const classDistribution = [
-      { grade: 'Grade 6', rate: 98.2 },
-      { grade: 'Grade 7', rate: 97.5 },
-      { grade: 'Grade 8', rate: 96.8 },
-      { grade: 'Grade 9', rate: 95.4 },
-      { grade: 'Grade 10', rate: 96.5 },
-      { grade: 'Grade 11', rate: 94.8 },
-      { grade: 'Grade 12', rate: 98.9 },
-    ];
+    const records = scopeAcademicRecords(db.prepare('SELECT * FROM attendance_records ORDER BY date ASC').all(), req.user!, db);
+    const dates = [...new Set(records.map(record => record.date))].sort().slice(-7);
+    const trends = dates.map(date => {
+      const day = records.filter(record => record.date === date);
+      const presentCount = day.filter(record => ['PRESENT', 'LATE'].includes(record.status)).length;
+      return { date, presentCount, absentCount: day.filter(record => record.status === 'ABSENT').length, attendanceRate: Number((presentCount / day.length * 100).toFixed(1)) };
+    });
+    const classDistribution = [...new Set(records.map(record => record.grade))].map(grade => {
+      const group = records.filter(record => record.grade === grade);
+      return { grade, rate: Number((group.filter(record => ['PRESENT', 'LATE'].includes(record.status)).length / group.length * 100).toFixed(1)) };
+    });
 
     return res.json({ trends, classDistribution });
   } catch (err: any) {

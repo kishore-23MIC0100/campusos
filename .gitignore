@@ -35,3 +35,14 @@ pnpm-debug.log*
 # Vercel
 .vercel
 .env*
+!.env.example
+
+# Local runtime records and test output
+data/
+server/data/campusos_data.json
+coverage/
+test-results/
+playwright-report/
+
+# Local mutable database; demo records are generated from server/src/seed.ts
+server/data/

@@ -1,8 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { randomBytes } from 'node:crypto';
 import { getDb } from '../db.js';
 
-const getJwtSecret = () => process.env.JWT_SECRET || 'campusos-super-secret-enterprise-jwt-key-2026';
+const developmentSecret = randomBytes(48).toString('hex');
+export const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (secret && secret.length >= 32 && secret !== 'campusos-super-secret-enterprise-jwt-key-2026') return secret;
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) throw new Error('Set JWT_SECRET to a random value of at least 32 characters.');
+  return developmentSecret;
+};
 
 export interface AuthenticatedUser {
   id: string;
@@ -14,6 +21,7 @@ export interface AuthenticatedUser {
   studentId?: string;
   department?: string;
   phone?: string;
+  tokenVersion?: number;
 }
 
 declare global {
@@ -28,6 +36,7 @@ export function generateToken(user: any) {
   return jwt.sign(
     {
       id: user.id,
+      tokenVersion: Number(user.token_version || 0),
       email: user.email,
       username: user.username,
       role: user.role,
@@ -38,7 +47,7 @@ export function generateToken(user: any) {
       phone: user.phone,
     },
     getJwtSecret(),
-    { expiresIn: '7d' }
+    { expiresIn: '8h', algorithm: 'HS256', issuer: 'campusos', audience: 'campusos-client' }
   );
 }
 
@@ -50,22 +59,24 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, getJwtSecret()) as AuthenticatedUser;
+    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'], issuer: 'campusos', audience: 'campusos-client' }) as AuthenticatedUser;
     
     // Check if user still exists and is APPROVED in database
     const db = getDb();
-    const user = db.prepare('SELECT id, email, username, role, full_name, status, student_id, department FROM users WHERE id = ?').get(decoded.id) as any;
+    const user = db.prepare('SELECT id, email, username, role, full_name, status, student_id, department, phone, token_version FROM users WHERE id = ?').get(decoded.id) as any;
     
     if (!user) {
       return res.status(401).json({ error: 'User account not found.' });
     }
 
+    if (Number(decoded.tokenVersion || 0) !== Number(user.token_version || 0)) return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
     if (user.status !== 'APPROVED') {
       return res.status(403).json({ error: `Account access restricted. Status is ${user.status}.` });
     }
 
     req.user = {
       id: user.id,
+      tokenVersion: Number(user.token_version || 0),
       email: user.email,
       username: user.username,
       role: user.role,
@@ -73,6 +84,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
       status: user.status,
       studentId: user.student_id,
       department: user.department,
+      phone: user.phone,
     };
 
     next();

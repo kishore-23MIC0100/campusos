@@ -1,81 +1,39 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request } from 'express';
 import { getDb } from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
-
-// Get notifications for current user / role
-router.get('/', authMiddleware, (req: Request, res: Response) => {
-  try {
-    const db = getDb();
-    const userId = req.user!.id;
-    const role = req.user!.role;
-
-    const allNotifs = db.prepare('SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50').all() as any[];
-
-    // Filter relevant notifications
-    const userNotifs = allNotifs.filter(n => {
-      if (n.user_id === userId || n.user_id === 'ALL' || n.user_id === 'ALL_STUDENTS') return true;
-      if (n.target_role === 'ALL' || n.target_role === role) return true;
-      return false;
-    });
-
-    const unreadCount = userNotifs.filter(n => !n.is_read).length;
-
-    return res.json({
-      notifications: userNotifs,
-      unreadCount,
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to fetch notifications.' });
-  }
+function visible(notification: any, req: Request) {
+  // A named recipient always wins over the broad role tag.
+  if (notification.user_id && !['ALL', 'ALL_STUDENTS'].includes(notification.user_id)) return notification.user_id === req.user!.id;
+  if (notification.user_id === 'ALL_STUDENTS') return req.user!.role === 'STUDENT';
+  return notification.target_role === 'ALL' || notification.target_role === req.user!.role;
+}
+function isRead(notification: any, userId: string) { return notification.read_by?.includes(userId) || (notification.user_id === userId && Boolean(notification.is_read)); }
+router.get('/', authMiddleware, (req, res) => {
+  const notifications = getDb().prepare('SELECT * FROM notifications ORDER BY created_at DESC').all().filter(notification => visible(notification, req) && !notification.dismissed_by?.includes(req.user!.id)).slice(0, 50).map(notification => ({ ...notification, is_read: isRead(notification, req.user!.id) ? 1 : 0 }));
+  res.json({ notifications, unreadCount: notifications.filter(notification => !notification.is_read).length });
 });
-
-// Mark single notification as read
-router.put('/:id/read', authMiddleware, (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const db = getDb();
-    db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ?').run(id);
-    return res.json({ message: 'Marked as read.' });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to update notification.' });
-  }
+router.put('/read-all', authMiddleware, (req, res) => {
+  const db = getDb();
+  for (const notification of db.prepare('SELECT * FROM notifications').all()) if (visible(notification, req)) notification.read_by = [...new Set([...(notification.read_by || []), req.user!.id])];
+  db.scheduleSave(); res.json({ message: 'Your notifications are marked as read.' });
 });
-
-// Mark all as read
-router.put('/read-all', authMiddleware, (req: Request, res: Response) => {
-  try {
-    const db = getDb();
-    db.prepare('UPDATE notifications SET is_read = 1').run();
-    return res.json({ message: 'All notifications marked as read.' });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to mark notifications.' });
-  }
+router.put('/:id/read', authMiddleware, (req, res) => {
+  const db = getDb(); const notification = db.prepare('SELECT * FROM notifications WHERE id = ?').get(req.params.id);
+  if (!notification || !visible(notification, req)) return res.status(404).json({ error: 'Notification not found.' });
+  notification.read_by = [...new Set([...(notification.read_by || []), req.user!.id])];
+  db.scheduleSave(); res.json({ message: 'Marked as read.' });
 });
-
-// Delete single notification
-router.delete('/:id', authMiddleware, (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const db = getDb();
-    db.prepare('DELETE FROM notifications WHERE id = ?').run(id);
-    return res.json({ message: 'Notification removed.' });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to delete notification.' });
-  }
+router.delete('/:id', authMiddleware, (req, res) => {
+  const db = getDb(); const notification = db.prepare('SELECT * FROM notifications WHERE id = ?').get(req.params.id);
+  if (!notification || !visible(notification, req)) return res.status(404).json({ error: 'Notification not found.' });
+  notification.dismissed_by = [...new Set([...(notification.dismissed_by || []), req.user!.id])];
+  db.scheduleSave(); res.json({ message: 'Notification dismissed.' });
 });
-
-// Clear all notifications for user
-router.delete('/', authMiddleware, (req: Request, res: Response) => {
-  try {
-    const db = getDb();
-    const userId = req.user!.id;
-    db.prepare('DELETE FROM notifications WHERE user_id = ? OR target_role = ? OR target_role = "ALL"').run(userId, req.user!.role);
-    return res.json({ message: 'Notifications cleared.' });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to clear notifications.' });
-  }
+router.delete('/', authMiddleware, (req, res) => {
+  const db = getDb();
+  for (const notification of db.prepare('SELECT * FROM notifications').all()) if (visible(notification, req)) notification.dismissed_by = [...new Set([...(notification.dismissed_by || []), req.user!.id])];
+  db.scheduleSave(); res.json({ message: 'Your notifications are cleared.' });
 });
-
 export default router;

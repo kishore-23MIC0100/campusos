@@ -1,88 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
-import { HeartHandshake, Search, Phone, Mail, MapPin, User, ChevronRight } from 'lucide-react';
+import { HeartHandshake, Search, Phone, Mail, MapPin, ArrowUpRight } from 'lucide-react';
+import { DashboardFeedback, DashboardHeader, EmptyState, Panel, useWorkspaceData } from '../dashboard/WorkspaceOverview';
 
-export const ParentsPage: React.FC = () => {
-  const [parents, setParents] = useState<any[]>([]);
+function childIds(value: unknown): string[] {
+  try { const parsed = typeof value === 'string' ? JSON.parse(value) : value; return Array.isArray(parsed) ? parsed.filter(item => typeof item === 'string') : []; } catch { return []; }
+}
+export function ParentsPage() {
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await api.getParents({ search });
-        setParents(res.parents || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [search]);
-
-  return (
-    <div className="space-y-6 animate-fadeIn">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-teal-600 mb-1">
-            <HeartHandshake className="w-4 h-4" />
-            <span>Parent Association & Guardian Directory</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">
-            Parents Directory
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Registered Guardian Information & Multi-Child Linkage Data
-          </p>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-iris-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by parent name, child name, email, phone..."
-            className="glass-input w-full pl-10 pr-4 py-2 text-xs rounded-xl"
-          />
-        </div>
-      </div>
-
-      {/* Parents Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {parents.map((par) => (
-          <div key={par.id} className="bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 font-bold text-base flex items-center justify-center border border-amber-200">
-                {par.first_name[0]}{par.last_name[0]}
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900">{par.first_name} {par.last_name}</h3>
-                <div className="text-[11px] text-slate-500">{par.occupation || 'Parent Association Member'}</div>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-xs text-slate-600">
-              <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-400" /><span className="font-mono">{par.phone}</span></div>
-              <div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-slate-400" /><span>{par.email}</span></div>
-              <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /><span>{par.address || 'Knowledge Corridor'}</span></div>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-              <div className="font-bold text-slate-800 mb-1">Linked Children:</div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-lg bg-blue-100 text-blue-800 font-semibold text-[10px]">Arav Patel (Grade 10A)</span>
-                <span className="px-2 py-0.5 rounded-lg bg-blue-100 text-blue-800 font-semibold text-[10px]">Diya Patel (Grade 7A)</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+  const load = useCallback(async () => { const [parents, students] = await Promise.all([api.getParents(), api.getStudents()]); return { parents: parents.parents, students: students.students }; }, []);
+  const { data, loading, error, refresh } = useWorkspaceData(load);
+  const parents = (data?.parents || []).filter(parent => `${parent.first_name} ${parent.last_name} ${parent.email} ${parent.phone}`.toLowerCase().includes(search.trim().toLowerCase()));
+  return <div className="workspace-overview"><DashboardHeader eyebrow="People & community" title="Every family, connected." description="A directory of registered parents, guardians and their linked students." refresh={refresh} loading={loading} />
+    <section className="attendance-controls"><label className="parent-directory-search"><span>Find a parent or guardian</span><div><Search size={16} /><input aria-label="Search parents" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search name, email or phone" /></div></label><span className="workspace-muted">{parents.length} registered {parents.length === 1 ? 'guardian' : 'guardians'}</span></section>
+    <DashboardFeedback loading={loading} error={error} refresh={refresh}>{parents.length ? <div className="parent-directory-grid">{parents.map(parent => {
+      const ids = childIds(parent.children_ids);
+      const children = (data?.students || []).filter(student => ids.includes(student.id) || ids.includes(student.student_id) || student.parent_id === parent.id || student.parent_id === parent.user_id);
+      return <section className="parent-directory-card" key={parent.id}><div className="parent-directory-heading"><span>{parent.first_name?.[0]}{parent.last_name?.[0]}</span><div><h2>{parent.first_name} {parent.last_name}</h2><p>{parent.occupation || 'Registered guardian'}</p></div></div><div className="parent-directory-details"><div><Phone size={14} />{parent.phone ? <a href={`tel:${parent.phone}`}>{parent.phone}</a> : <span>Phone not provided</span>}</div><div><Mail size={14} />{parent.email ? <a href={`mailto:${parent.email}`}>{parent.email}</a> : <span>Email not provided</span>}</div><div><MapPin size={14} /><span>{parent.address || 'Address not provided'}</span></div></div><div className="parent-directory-children"><h3>Linked students</h3>{children.length ? children.map(child => <Link key={child.id} to={`/students/${child.id}`}><span>{child.first_name} {child.last_name}<small>{child.grade} {child.section}</small></span><ArrowUpRight size={14} /></Link>) : <p>No linked student profiles.</p>}</div></section>;
+    })}</div> : <Panel title="Parent directory"><EmptyState title={search ? 'No matching guardians' : 'No parent profiles yet'} description={search ? 'Try another name, email address or phone number.' : 'Registered guardian profiles will appear here.'} icon={HeartHandshake} /></Panel>}</DashboardFeedback>
+  </div>;
+}

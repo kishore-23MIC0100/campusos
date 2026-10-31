@@ -1,0 +1,31 @@
+name: Validate CampusOS
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+            server/package-lock.json
+      - name: Install locked dependencies
+        run: npm run setup
+      - name: Unit and API integration tests
+        run: npm test
+      - name: Isolated six-role system tests
+        run: npm run test:roles
+      - name: Typecheck and production builds
+        run: npm run build
+      - name: Dependency vulnerability audit
+        run: npm run audit

@@ -43,8 +43,7 @@ router.get('/my-children', authMiddleware, (req: Request, res: Response) => {
         children = db.prepare(`SELECT * FROM students WHERE id IN (${placeholders})`).all(...childIds);
       }
     } else {
-      // Fallback: search students matching parent email or name
-      children = db.prepare('SELECT * FROM students WHERE parent_id = ? OR LOWER(parent_name) LIKE ?').all(userId, `%${req.user!.fullName.split(' ')[0].toLowerCase()}%`);
+      children = db.prepare('SELECT * FROM students WHERE parent_id = ?').all(userId);
     }
 
     // Attach deep academic context to each child (attendance %, recent homework, performance summary)
