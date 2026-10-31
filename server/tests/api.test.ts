@@ -169,6 +169,8 @@ test('staff category is editable, discoverable in the directory and reversibly a
   assert.equal(created.status, 201); const id=created.body.staff.id;
   assert.equal(created.body.staff.avatar_url, null); assert.equal(created.body.staff.base_salary, 0);
   assert.equal((await call(`/staff/${id}`,tokens.SUPER_ADMIN,'PUT',{staffCategory:'IT_SUPPORT',designation:'IT Support Engineer'})).status,200);
+  assert.equal((await call(`/staff/${id}`,tokens.SUPER_ADMIN,'PUT',{email:'marcus.vance@campusos.edu',staffCategory:'SECURITY'})).status,409);
+  assert.equal((await call(`/staff/${id}`,tokens.SUPER_ADMIN)).body.staff.staff_category,'IT_SUPPORT');
   const directory=await call('/staff/directory?search=technician-regression',tokens.SUPER_ADMIN);
   // Search matches person, department, designation and employee ID rather than private HR fields.
   assert.equal(directory.status,200);

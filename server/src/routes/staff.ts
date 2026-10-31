@@ -212,9 +212,9 @@ router.put('/:id', authMiddleware, requireRoles('SUPER_ADMIN', 'SCHOOL_ADMIN'), 
     if (baseSalary !== undefined && (!Number.isFinite(Number(baseSalary)) || Number(baseSalary) < 0)) return res.status(400).json({ error: 'Salary must be a non-negative number.' });
     if (status && !['ACTIVE', 'ON_LEAVE', 'INACTIVE', 'ARCHIVED'].includes(status)) return res.status(400).json({ error: 'Choose a supported employment status.' });
     if (role && !['TEACHER','FACULTY','STAFF'].includes(role)) return res.status(400).json({ error: 'Choose a supported staff role.' });
+    if (email && db.prepare('SELECT * FROM staff_details').all().some(member => member.id !== staff.id && String(member.email || '').toLowerCase() === email.trim().toLowerCase())) return res.status(409).json({ error: 'A staff record with this email already exists.' });
     if (role) staff.role = role;
     if (staffCategory) staff.staff_category = staffCategory;
-    if (email && db.prepare('SELECT * FROM staff_details').all().some(member => member.id !== staff.id && String(member.email || '').toLowerCase() === email.trim().toLowerCase())) return res.status(409).json({ error: 'A staff record with this email already exists.' });
     if (fullName) staff.full_name = fullName.trim();
     if (email) staff.email = email.trim().toLowerCase();
     if (phone !== undefined) staff.phone = phone || null;
