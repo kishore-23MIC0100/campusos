@@ -224,8 +224,8 @@ export const StudentsPage: React.FC = () => {
 
       {/* Student Roster Table */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto" role="region" aria-label="Student directory table" tabIndex={0}>
+          <table className="w-full min-w-[1100px] whitespace-nowrap text-left text-xs">
             <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
               <tr>
                 <th className="py-3.5 px-6">Student</th>
