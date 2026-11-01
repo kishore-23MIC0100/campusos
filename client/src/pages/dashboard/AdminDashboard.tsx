@@ -19,7 +19,7 @@ export function AdminDashboard() {
   const metrics = data?.report.metrics;
   const attendance = data?.attendance || [];
   return <div className="workspace-overview">
-    <DashboardHeader eyebrow="Institution overview" title={`Welcome back, ${user?.fullName?.split(' ')[0] || 'Administrator'}.`} description="A clear view of your people, priorities and campus activity." refresh={refresh} loading={loading} action={<Link className="workspace-primary" to="/reports">View reports <ArrowUpRight size={15} /></Link>} />
+    <DashboardHeader eyebrow="Institution overview" title={`Welcome back, ${user?.fullName || 'Administrator'}.`} description="A clear view of your people, priorities and campus activity." refresh={refresh} loading={loading} action={<Link className="workspace-primary" to="/reports">View reports <ArrowUpRight size={15} /></Link>} />
     <DashboardFeedback loading={loading} error={error} refresh={refresh}>
       <MetricGrid items={[
         { label: 'Enrolled students', value: metrics?.totalStudents?.toLocaleString('en-IN'), detail: 'Students in your institution', icon: Users, featured: true },
