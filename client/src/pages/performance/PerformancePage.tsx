@@ -1,35 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import React, { useState, useEffect } from "react";
+import { api } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 import {
-  TrendingUp, BarChart2, Award, Plus, Search, CheckCircle2,
-  X, Filter, UserCheck, Shield
-} from 'lucide-react';
+  TrendingUp,
+  BarChart2,
+  Award,
+  Plus,
+  Search,
+  CheckCircle2,
+  X,
+  Filter,
+  UserCheck,
+  Shield,
+} from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart,
-  PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
-} from 'recharts';
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+} from "recharts";
 
 export const PerformancePage: React.FC = () => {
   const { user } = useAuth();
-  const isTeacher = user?.role === 'TEACHER';
-  const personalView = user?.role === 'STUDENT' || user?.role === 'PARENT';
-  const [error, setError] = useState('');
+  const isTeacher = user?.role === "TEACHER";
+  const personalView = user?.role === "STUDENT" || user?.role === "PARENT";
+  const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
 
   const availableGrades = React.useMemo(() => {
-    if (isTeacher) return Array.from(new Set((user?.allottedClasses || []).map((c) => c.grade)));
+    if (isTeacher)
+      return Array.from(
+        new Set((user?.allottedClasses || []).map((c) => c.grade)),
+      );
     if (personalView) return [];
-    return ['Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
+    return [
+      "Grade 6",
+      "Grade 7",
+      "Grade 8",
+      "Grade 9",
+      "Grade 10",
+      "Grade 11",
+      "Grade 12",
+    ];
   }, [isTeacher, personalView, user?.allottedClasses]);
 
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [subjectAverages, setSubjectAverages] = useState<any[]>([]);
   const [grade, setGrade] = useState(() => {
-    if (user?.role === 'TEACHER' && user.allottedClasses?.[0]?.grade) {
+    if (user?.role === "TEACHER" && user.allottedClasses?.[0]?.grade) {
       return user.allottedClasses[0].grade;
     }
-    return 'Grade 10';
+    return "Grade 10";
   });
   const [loading, setLoading] = useState(true);
 
@@ -45,24 +73,61 @@ export const PerformancePage: React.FC = () => {
   useEffect(() => {
     let active = true;
     const load = async () => {
-      setLoading(true); setError('');
+      setLoading(true);
+      setError("");
       try {
-        const res = await api.getPerformance(personalView ? undefined : { grade });
+        const res = await api.getPerformance(
+          personalView ? undefined : { grade },
+        );
         if (!active) return;
         setPerformanceData(res.records || []);
         setSubjectAverages(res.subjectAverages || []);
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Performance records could not be loaded.');
+        if (active)
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Performance records could not be loaded.",
+          );
       } finally {
         if (active) setLoading(false);
       }
     };
     load();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [grade, personalView, attempt]);
 
-  if (loading) return <div role="status" className="space-y-5"><div className="h-24 animate-pulse rounded-2xl bg-slate-200/50" /><div className="grid gap-5 md:grid-cols-2"><div className="h-64 animate-pulse rounded-2xl bg-slate-200/50" /><div className="h-64 animate-pulse rounded-2xl bg-slate-200/50" /></div><p className="text-sm text-slate-500">Loading assessment results...</p></div>;
-  if (error) return <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-rose-800"><h1 className="text-lg font-semibold">Assessment results unavailable</h1><p className="mt-2 text-sm">{error}</p><button onClick={() => setAttempt(value => value + 1)} className="mt-5 rounded-xl border border-rose-300 px-4 py-2 text-sm">Try again</button></div>;
+  if (loading)
+    return (
+      <div role="status" className="space-y-5">
+        <div className="h-24 animate-pulse rounded-2xl bg-slate-200/50" />
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="h-64 animate-pulse rounded-2xl bg-slate-200/50" />
+          <div className="h-64 animate-pulse rounded-2xl bg-slate-200/50" />
+        </div>
+        <p className="text-sm text-slate-500">Loading assessment results...</p>
+      </div>
+    );
+  if (error)
+    return (
+      <div
+        role="alert"
+        className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-rose-800"
+      >
+        <h1 className="text-lg font-semibold">
+          Assessment results unavailable
+        </h1>
+        <p className="mt-2 text-sm">{error}</p>
+        <button
+          onClick={() => setAttempt((value) => value + 1)}
+          className="mt-5 rounded-xl border border-rose-300 px-4 py-2 text-sm"
+        >
+          Try again
+        </button>
+      </div>
+    );
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -72,7 +137,9 @@ export const PerformancePage: React.FC = () => {
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-teal-600 mb-1">
             <TrendingUp className="w-4 h-4" />
             <span>
-              {isTeacher ? 'Faculty Academic Analytics' : 'Diagnostic Academic Analytics'}
+              {isTeacher
+                ? "Faculty Academic Analytics"
+                : "Diagnostic Academic Analytics"}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display">
@@ -80,23 +147,29 @@ export const PerformancePage: React.FC = () => {
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             {isTeacher
-              ? `Oakridge International School • Diagnostic metrics for allotted classes (${availableGrades.join(', ')})`
-              : personalView ? 'Recorded assessment results for the students linked to your account.' : 'Recorded class assessment results and subject averages.'}
+              ? `Oakridge International School • Diagnostic metrics for allotted classes (${availableGrades.join(", ")})`
+              : personalView
+                ? "Recorded assessment results for the students linked to your account."
+                : "Recorded class assessment results and subject averages."}
           </p>
         </div>
 
-        {!personalView && <div>
-          <select
-            aria-label="Performance grade"
-            value={grade}
-            onChange={(e) => setGrade(e.target.value)}
-            className="glass-input px-3.5 py-2 text-xs font-bold rounded-xl bg-white text-slate-800 cursor-pointer shadow-2xs border border-slate-300"
-          >
-            {availableGrades.map((g) => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-        </div>}
+        {!personalView && (
+          <div>
+            <select
+              aria-label="Performance grade"
+              value={grade}
+              onChange={(e) => setGrade(e.target.value)}
+              className="glass-input px-3.5 py-2 text-xs font-bold rounded-xl bg-white text-slate-800 cursor-pointer shadow-2xs border border-slate-300"
+            >
+              {availableGrades.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Teacher Allotment Notice */}
@@ -106,11 +179,18 @@ export const PerformancePage: React.FC = () => {
             <UserCheck className="w-5 h-5 text-teal-700 flex-shrink-0" />
             <div>
               <span className="font-bold">Faculty Allotment Scope: </span>
-              <span>Showing diagnostic performance records for your allotted classes: </span>
-              <span className="font-semibold text-teal-900 bg-white/80 px-2 py-0.5 rounded border border-teal-200">
-                {user.allottedClasses.map((c) => `${c.grade}-${c.section}`).join(', ')}
+              <span>
+                Showing diagnostic performance records for your allotted
+                classes:{" "}
               </span>
-              <span className="text-teal-800 ml-1.5">• Unallotted grades are hidden.</span>
+              <span className="font-semibold text-teal-900 bg-white/80 px-2 py-0.5 rounded border border-teal-200">
+                {user.allottedClasses
+                  .map((c) => `${c.grade}-${c.section}`)
+                  .join(", ")}
+              </span>
+              <span className="text-teal-800 ml-1.5">
+                • Unallotted grades are hidden.
+              </span>
             </div>
           </div>
           <span className="hidden md:inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-teal-700 text-white">
@@ -123,33 +203,83 @@ export const PerformancePage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 font-display">Subject-wise Average Mastery</h3>
+            <h3 className="text-base font-bold text-slate-900 font-display">
+              Subject-wise Average Mastery
+            </h3>
             <span className="text-xs text-slate-500">Recorded marks (%)</span>
           </div>
 
           <div className="h-64 w-full">
-            {!subjectAverages.length ? <div className="flex h-full items-center justify-center text-sm text-slate-500">No subject results recorded yet.</div> : <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={subjectAverages}>
-                <XAxis dataKey="subject" stroke="#94A3B8" fontSize={10} />
-                <YAxis domain={[0, 100]} stroke="#94A3B8" fontSize={11} />
-                <Tooltip />
-                <Bar dataKey="average" fill="#0D9488" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>}
+            {!subjectAverages.length ? (
+              <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                No subject results recorded yet.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={subjectAverages}>
+                  <XAxis
+                    dataKey="subject"
+                    stroke="var(--workspace-muted)"
+                    fontSize={10}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    stroke="var(--workspace-muted)"
+                    fontSize={11}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--workspace-surface)",
+                      color: "var(--workspace-ink)",
+                      border: "1px solid var(--workspace-line)",
+                      borderRadius: 9,
+                    }}
+                    labelStyle={{ color: "var(--workspace-ink)" }}
+                  />
+                  <Bar
+                    dataKey="average"
+                    fill="var(--workspace-accent)"
+                    radius={[8, 8, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
         <div className="lg:col-span-5 bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
-          <h3 className="text-base font-bold text-slate-900 font-display">Subject performance overview</h3>
+          <h3 className="text-base font-bold text-slate-900 font-display">
+            Subject performance overview
+          </h3>
           <div className="h-64 w-full">
-            {!subjectAverages.length ? <div className="flex h-full items-center justify-center text-sm text-slate-500">No subject results recorded yet.</div> : <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={subjectAverages}>
-                <PolarGrid stroke="#E2E8F0" />
-                <PolarAngleAxis dataKey="subject" stroke="#64748B" fontSize={10} />
-                <PolarRadiusAxis domain={[0, 100]} stroke="#CBD5E1" fontSize={10} />
-                <Radar name="Class Score" dataKey="average" stroke="#1E3A8A" fill="#1E3A8A" fillOpacity={0.4} />
-              </RadarChart>
-            </ResponsiveContainer>}
+            {!subjectAverages.length ? (
+              <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                No subject results recorded yet.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={subjectAverages}>
+                  <PolarGrid stroke="var(--workspace-line)" />
+                  <PolarAngleAxis
+                    dataKey="subject"
+                    stroke="var(--workspace-muted)"
+                    fontSize={10}
+                  />
+                  <PolarRadiusAxis
+                    domain={[0, 100]}
+                    stroke="var(--workspace-muted)"
+                    fontSize={10}
+                  />
+                  <Radar
+                    name="Class Score"
+                    dataKey="average"
+                    stroke="var(--workspace-accent)"
+                    fill="var(--workspace-accent)"
+                    fillOpacity={0.18}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -157,7 +287,7 @@ export const PerformancePage: React.FC = () => {
       {/* Performance Roster */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-card overflow-x-auto">
         <div className="p-6 border-b border-slate-100 font-bold text-base text-slate-900 font-display">
-          Assessment results ({personalView ? 'linked students' : grade})
+          Assessment results ({personalView ? "linked students" : grade})
         </div>
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
@@ -172,20 +302,34 @@ export const PerformancePage: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
-            {!performanceData.length && <tr><td colSpan={7} className="p-10 text-center text-slate-500">No assessment results recorded for this selection.</td></tr>}
+            {!performanceData.length && (
+              <tr>
+                <td colSpan={7} className="p-10 text-center text-slate-500">
+                  No assessment results recorded for this selection.
+                </td>
+              </tr>
+            )}
             {performanceData.map((rec) => (
               <tr key={rec.id} className="hover:bg-slate-50/80">
-                <td className="py-3 px-6 font-bold text-slate-900">{rec.student_name}</td>
-                <td className="py-3 px-4 text-slate-700 font-semibold">{rec.subject}</td>
+                <td className="py-3 px-6 font-bold text-slate-900">
+                  {rec.student_name}
+                </td>
+                <td className="py-3 px-4 text-slate-700 font-semibold">
+                  {rec.subject}
+                </td>
                 <td className="py-3 px-4 text-slate-500">{rec.exam_type}</td>
-                <td className="py-3 px-4 font-bold text-slate-800">{rec.marks_obtained} / {rec.max_marks}</td>
+                <td className="py-3 px-4 font-bold text-slate-800">
+                  {rec.marks_obtained} / {rec.max_marks}
+                </td>
                 <td className="py-3 px-4">
                   <span className="px-2 py-0.5 rounded-md font-bold bg-teal-100 text-teal-800 text-[10px]">
                     {rec.grade_letter}
                   </span>
                 </td>
                 <td className="py-3 px-4 font-mono">{rec.percentile}%</td>
-                <td className="py-3 px-6 text-slate-600">{rec.teacher_remarks}</td>
+                <td className="py-3 px-6 text-slate-600">
+                  {rec.teacher_remarks}
+                </td>
               </tr>
             ))}
           </tbody>

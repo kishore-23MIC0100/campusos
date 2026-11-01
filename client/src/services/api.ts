@@ -659,7 +659,13 @@ export const api = {
   },
 
   // Payroll Management
-  async getPayrollSummary() {
+  async getPayrollSummary(params?: {
+    month?: string;
+    year?: number;
+    department?: string;
+    status?: string;
+    search?: string;
+  }) {
     return apiFetch<{
       month: string;
       year: number;
@@ -671,7 +677,7 @@ export const api = {
       pendingDisbursements: number;
       totalDeductions: number;
       departmentBreakdown: Record<string, number>;
-    }>("/payroll/summary");
+    }>(`/payroll/summary?${buildQuery(params)}`);
   },
 
   async getPayrollRecords(params?: {
