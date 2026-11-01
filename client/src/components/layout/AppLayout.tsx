@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api, type User } from "../../services/api";
@@ -39,6 +46,7 @@ import {
   Moon,
 } from "lucide-react";
 import "../../workspace.css";
+import "../../workspace-modules.css";
 
 type NavItem = {
   label: string;
@@ -187,6 +195,9 @@ type Notification = Awaited<
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const location = useLocation();
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [location.pathname]);
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme: workspaceTheme, toggleTheme } = useWorkspaceTheme();
