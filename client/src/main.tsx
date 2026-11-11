@@ -12,3 +12,9 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker.register('/sw.js').catch((error: unknown) => {
+    console.warn('Scholaxys could not enable offline navigation.', error)
+  })
+}
